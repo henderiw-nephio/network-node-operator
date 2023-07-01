@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/component: tbd
+    app.kubernetes.io/instance: tbd
+    app.kubernetes.io/managed-by: kpt
+    app.kubernetes.io/name: network-node
+    app.kubernetes.io/part-of: network-node
+    app.kubernetes.io/version: tbd
+  name: network-node-controller-inventory-role
+  namespace: network-system
+  annotations: {}
+rules:
+- apiGroups:
+  - inv.nephio.org
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - create
+  - delete
