@@ -102,7 +102,7 @@ func (r *reconciler) getPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*cor
 			TerminationGracePeriodSeconds: pointer.Int64(srlv1alpha1.TerminationGracePeriodSeconds),
 			NodeSelector:                  map[string]string{},
 			Affinity:                      srlv1alpha1.GetAffinity(cr.GetName()),
-			Volumes:                       nodeConfig.GetVolumes(),
+			Volumes:                       nodeConfig.GetVolumes(cr.GetName()),
 		},
 	}
 

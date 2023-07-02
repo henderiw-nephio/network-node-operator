@@ -36,8 +36,10 @@ const (
 	srlinuxPodAffinityWeight      = 100
 
 	// volumes
+	certificateVolName       = "certificate"
+	certificateVolMntPath    = "/tmp/initial-config"
 	initialConfigVolName     = "initial-config-volume"
-	initialConfigVolMntPath  = "/tmp/initial-config"
+	initialConfigVolMntPath  = "/k8s-certs"
 	initialConfigCfgMapName  = "srlinux-initial-config"
 	variantsVolName          = "variants"
 	variantsVolMntPath       = "/tmp/topo"
@@ -192,7 +194,7 @@ func (r *NodeConfig) GetResourceRequirements() corev1.ResourceRequirements {
 	return req
 }
 
-func (r *NodeConfig) GetVolumes() []corev1.Volume {
+func (r *NodeConfig) GetVolumes(name string) []corev1.Volume {
 	vols := []corev1.Volume{
 		{
 			Name: variantsVolName,
@@ -241,6 +243,15 @@ func (r *NodeConfig) GetVolumes() []corev1.Volume {
 				},
 			},
 		},
+		{
+			Name: certificateVolName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  name,
+					DefaultMode: pointer.Int32(420),
+				},
+			},
+		},
 	}
 	if r.Spec.LicenseKey != nil {
 		vols = append(vols, r.GetLicenseVolume())
@@ -265,6 +276,11 @@ func (r *NodeConfig) GetVolumeMounts() []corev1.VolumeMount {
 		},
 		{
 			Name:      initialConfigVolName,
+			MountPath: initialConfigVolMntPath,
+			ReadOnly:  false,
+		},
+		{
+			Name:      certificateVolName,
 			MountPath: initialConfigVolMntPath,
 			ReadOnly:  false,
 		},
