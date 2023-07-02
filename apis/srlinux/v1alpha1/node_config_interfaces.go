@@ -135,21 +135,19 @@ func (r *NodeConfig) GetContainers(name string) []corev1.Container {
 			RunAsUser:  pointer.Int64(0),
 		},
 		VolumeMounts: r.GetVolumeMounts(),
-		/*
-			ReadinessProbe: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{
-							"cat",
-							readinessFile,
-						},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"cat",
+						readinessFile,
 					},
 				},
-				InitialDelaySeconds: readinessInitialDelay,
-				PeriodSeconds:       readinessPeriodSeconds,
-				FailureThreshold:    readinessFailureThreshold,
 			},
-		*/
+			InitialDelaySeconds: readinessInitialDelay,
+			PeriodSeconds:       readinessPeriodSeconds,
+			FailureThreshold:    readinessFailureThreshold,
+		},
 	}}
 }
 
@@ -281,8 +279,8 @@ func (r *NodeConfig) GetVolumeMounts() []corev1.VolumeMount {
 		},
 		{
 			Name:      certificateVolName,
-			MountPath: initialConfigVolMntPath,
-			ReadOnly:  false,
+			MountPath: certificateVolMntPath,
+			ReadOnly:  true,
 		},
 	}
 
