@@ -36,6 +36,9 @@ const (
 	srlinuxPodAffinityWeight      = 100
 
 	// volumes
+	initialConfigVolName     = "initial-config-volume"
+	initialConfigVolMntPath  = "/tmp/initial-config"
+	initialConfigCfgMapName  = "srlinux-initial-config"
 	variantsVolName          = "variants"
 	variantsVolMntPath       = "/tmp/topo"
 	variantsTemplateTempName = "topo-template.yml"
@@ -131,19 +134,19 @@ func (r *NodeConfig) GetContainers(name string) []corev1.Container {
 		},
 		VolumeMounts: r.GetVolumeMounts(),
 		/*
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"cat",
-						readinessFile,
+			ReadinessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					Exec: &corev1.ExecAction{
+						Command: []string{
+							"cat",
+							readinessFile,
+						},
 					},
 				},
+				InitialDelaySeconds: readinessInitialDelay,
+				PeriodSeconds:       readinessPeriodSeconds,
+				FailureThreshold:    readinessFailureThreshold,
 			},
-			InitialDelaySeconds: readinessInitialDelay,
-			PeriodSeconds:       readinessPeriodSeconds,
-			FailureThreshold:    readinessFailureThreshold,
-		},
 		*/
 	}}
 }
@@ -228,6 +231,16 @@ func (r *NodeConfig) GetVolumes() []corev1.Volume {
 				},
 			},
 		},
+		{
+			Name: initialConfigVolName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: initialConfigCfgMapName,
+					},
+				},
+			},
+		},
 	}
 	if r.Spec.LicenseKey != nil {
 		vols = append(vols, r.GetLicenseVolume())
@@ -249,6 +262,11 @@ func (r *NodeConfig) GetVolumeMounts() []corev1.VolumeMount {
 			Name:      entrypointVolName,
 			MountPath: entrypointVolMntPath,
 			SubPath:   entrypointVolMntSubPath,
+		},
+		{
+			Name:      initialConfigVolName,
+			MountPath: initialConfigVolMntPath,
+			ReadOnly:  false,
 		},
 	}
 
