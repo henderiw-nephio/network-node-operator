@@ -130,6 +130,7 @@ func (r *NodeConfig) GetContainers(name string) []corev1.Container {
 			RunAsUser:  pointer.Int64(0),
 		},
 		VolumeMounts: r.GetVolumeMounts(),
+		/*
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
@@ -143,6 +144,7 @@ func (r *NodeConfig) GetContainers(name string) []corev1.Container {
 			PeriodSeconds:       readinessPeriodSeconds,
 			FailureThreshold:    readinessFailureThreshold,
 		},
+		*/
 	}}
 }
 
