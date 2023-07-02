@@ -24,7 +24,7 @@ import (
 
 const (
 	srlNodeLabelKey         = Group + "/" + "node"
-	defaultSRLinuxImageName = "ghcr.io/nokia/srlinux@latest"
+	defaultSRLinuxImageName = "ghcr.io/nokia/srlinux:latest"
 	defaultSrlinuxVariant   = "ixrd3l"
 
 	//

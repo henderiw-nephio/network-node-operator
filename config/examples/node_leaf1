@@ -1,0 +1,10 @@
+apiVersion: inv.nephio.org/v1alpha1
+kind: Node
+metadata:
+  name: leaf1
+spec:
+  provider: srlinux.nokia.com
+  #parametersRef:
+  #  apiVersion: srlinux.nokia.com
+  #  kind: NodeConfig
+  #  name: leaf1

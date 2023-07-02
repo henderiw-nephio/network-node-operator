@@ -18,6 +18,7 @@ package srlinux
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
@@ -25,8 +26,10 @@ import (
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -60,6 +63,7 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("SrlinuxNodeController").
 		For(&invv1alpha1.Node{}).
+		Owns(&corev1.Pod{}).
 		Complete(r)
 
 }
@@ -87,6 +91,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		return ctrl.Result{}, nil
 	}
+	cr = cr.DeepCopy()
 
 	if resource.WasDeleted(cr) {
 		if err := r.finalizer.RemoveFinalizer(ctx, cr); err != nil {
@@ -103,14 +108,25 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	d, err := r.getDeployment(ctx, cr)
+	pod, err := r.getPodSpec(ctx, cr)
 	if err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
-	if err := r.Apply(ctx, d); err != nil {
+	if err := r.Apply(ctx, pod); err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+
+	if err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod); err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+
+	msg, ready := getPodStatus(pod)
+	if !ready {
+		cr.SetConditions(srlv1alpha1.NotReady(msg))
+		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	cr.SetConditions(srlv1alpha1.Ready())

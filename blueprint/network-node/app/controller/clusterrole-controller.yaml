@@ -17,6 +17,31 @@ rules:
   resources:
   - events
   - configmaps
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - create
+  - delete
+- apiGroups:
+  - inv.nephio.org
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - create
+  - delete
+- apiGroups:
+  - inv.nephio.org
+  resources:
+  - nodes/status
   verbs:
   - get
   - list

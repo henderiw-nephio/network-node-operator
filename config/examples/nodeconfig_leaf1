@@ -1,0 +1,6 @@
+apiVersion: srlinux.nokia.com/v1alpha1
+kind: NodeConfig
+metadata:
+  name: leaf1
+spec:
+  
