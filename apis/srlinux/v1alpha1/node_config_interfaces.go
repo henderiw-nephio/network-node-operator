@@ -62,7 +62,7 @@ var (
 		"--",
 		"fixuid",
 		"-q",
-		"/kne-entrypoint.sh",
+		"/entrypoint.sh",
 	}
 
 	//nolint:gochecknoglobals

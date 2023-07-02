@@ -10,7 +10,7 @@ metadata:
   name: srlinux-entrypoint
   annotations: {}
 data:
-  kne-entrypoint.sh: |
+  entrypoint.sh: |
     #!/bin/bash
     # this entrypoint ensures that we call topomac script before executing the main entrypoint
 
