@@ -7,10 +7,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: srlinux-entrypoint
+  name: srlinux-k8s-entrypoint
   annotations: {}
 data:
-  entrypoint.sh: |
+  k8s-entrypoint.sh: |
     #!/bin/bash
     # this entrypoint ensures that we call topomac script before executing the main entrypoint
 
