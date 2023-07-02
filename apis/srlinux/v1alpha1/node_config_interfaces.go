@@ -37,9 +37,9 @@ const (
 
 	// volumes
 	certificateVolName       = "certificate"
-	certificateVolMntPath    = "/tmp/initial-config"
+	certificateVolMntPath    = "k8s-certs"
 	initialConfigVolName     = "initial-config-volume"
-	initialConfigVolMntPath  = "/k8s-certs"
+	initialConfigVolMntPath  = "/tmp/initial-config"
 	initialConfigCfgMapName  = "srlinux-initial-config"
 	variantsVolName          = "variants"
 	variantsVolMntPath       = "/tmp/topo"

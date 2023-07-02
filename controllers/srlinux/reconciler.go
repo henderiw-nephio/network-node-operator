@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -108,20 +107,26 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	pod, err := r.getPodSpec(ctx, cr)
-	if err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	pod := &corev1.Pod{}
+	if err := r.Get(ctx, req.NamespacedName, pod); err != nil {
+		if resource.IgnoreNotFound(err) != nil {
+			// an error occurred
+			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+		} else {
+			// create the Pod since it did not exist
+			pod, err := r.getPodSpec(ctx, cr)
+			if err != nil {
+				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+			}
+			if err := r.Apply(ctx, pod); err != nil {
+				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+			}
+		}
 	}
-	if err := r.Apply(ctx, pod); err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-	}
-
-	if err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod); err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-	}
+	// TODO handle change
 
 	msg, ready := getPodStatus(pod)
 	if !ready {
