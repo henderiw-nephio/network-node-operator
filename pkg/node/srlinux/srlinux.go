@@ -151,7 +151,13 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: NokiaSRLinuxProvider}, secret); err != nil {
 		return err
 	}
-	certData, err := cert.GetCertificateData(filepath.Join("tmp", certificateProfileName, certificateVolMntPath), certificateProfileName)
+
+	certSecret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.GetName()}, secret); err != nil {
+		return err
+	}
+
+	certData, err := cert.GetCertificateData(certSecret, certificateProfileName)
 	if err != nil {
 		return err
 	}
