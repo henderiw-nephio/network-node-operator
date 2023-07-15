@@ -33,6 +33,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 #FROM gcr.io/distroless/static:nonroot
 FROM debian
 #RUN apk add --update openssh
+RUN apt-get update && apt-get install -y ssh
 WORKDIR /
 COPY --from=builder /workspace/manager .
 #RUN addgroup -S admingroup
