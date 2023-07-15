@@ -98,19 +98,17 @@ var (
 
 // Register registers the node in the NodeRegistry.
 func Register(r node.NodeRegistry) {
-	r.Register(NokiaSRLinuxProvider, func() node.Node {
-		return new(srl)
+	r.Register(NokiaSRLinuxProvider, func(c client.Client, s *runtime.Scheme) node.Node {
+		return &srl{
+			Client: c,
+			scheme: s,
+		}
 	})
 }
 
 type srl struct {
 	client.Client
 	scheme *runtime.Scheme
-}
-
-func (r *srl) Init(c client.Client, s *runtime.Scheme) {
-	r.Client = c
-	r.scheme = s
 }
 
 func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod, error) {

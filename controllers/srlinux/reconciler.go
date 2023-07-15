@@ -113,7 +113,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	node, err := r.nodeRegistry.NewNodeOfProvider(cr.Spec.Provider)
+	node, err := r.nodeRegistry.NewNodeOfProvider(cr.Spec.Provider, r.Client, r.scheme)
 	if err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
@@ -139,7 +139,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 	// TODO handle change
-	
+
 	podIPs, msg, ready := getPodStatus(pod)
 	if !ready {
 		cr.SetConditions(srlv1alpha1.NotReady(msg))
