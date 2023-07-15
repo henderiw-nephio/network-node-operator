@@ -12,8 +12,6 @@ const (
 	keyEndMarker    = "-----END RSA PRIVATE KEY-----"
 	certStartMarker = "-----BEGIN CERTIFICATE-----"
 	certEndMarker   = "-----END CERTIFICATE-----"
-	caStartMarker   = "-----BEGIN CERTIFICATE-----"
-	caEndMarker     = "-----END CERTIFICATE-----"
 )
 
 type CertData struct {
@@ -67,48 +65,34 @@ type CertData struct {
 	}
 */
 func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error) {
+	certData := &CertData{
+		ProfileName: profile,
+	}
 	certFiles := []string{"ca.crt", "tls.crt", "tls.key"}
 	for _, certFile := range certFiles {
-		fmt.Printf("certfile: %q \ndata: %q \n", certFile, string(secret.Data[certFile]))
+		var found bool
+		switch certFile {
+		case "ca.crt":
+			certData.CA, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certStartMarker, true)
+			if !found {
+				return nil, fmt.Errorf("cannot get the ca string")
+			}
+		case "tls.crt":
+			certData.Cert, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
+			if !found {
+				return nil, fmt.Errorf("cannot get the tls cert string")
+			}
+		case "tls.key":
+			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, false)
+			if !found {
+				return nil, fmt.Errorf("cannot get the tls key string")
+			}
+			certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
+		}
 	}
-	return nil, fmt.Errorf("not implemented yet")
+	return certData, nil
 
-	/*
-
-		certData := &CertData{
-			ProfileName: profile,
-		}
-		fmt.Printf("getCertificateData: %s\n", dir)
-
-		certFiles := []string{"ca.crt", "tls.crt", "tls.key"}
-		for _, certFile := range certFiles {
-			var found bool
-			b, err := os.ReadFile(filepath.Join(dir, certFile))
-			if err != nil {
-				fmt.Printf("getCertificateData: err: %s\n", err.Error())
-				return nil, err
-			}
-			switch certFile {
-			case "ca.crt":
-				certData.CA, found = getStringInBetween(string(b), caStartMarker, caEndMarker, true)
-				if !found {
-					return nil, fmt.Errorf("cannot get the ca string")
-				}
-			case "tls.crt":
-				certData.Cert, found = getStringInBetween(string(b), certStartMarker, certEndMarker, true)
-				if !found {
-					return nil, fmt.Errorf("cannot get the tls cert string")
-				}
-			case "tls.key":
-				certData.Key, found = getStringInBetween(string(b), keyStartMarker, keyEndMarker, false)
-				if !found {
-					return nil, fmt.Errorf("cannot get the tls key string")
-				}
-				certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
-			}
-		}
-		return certData, nil
-	*/
+	
 }
 
 // GetStringInBetween returns a string between the start/end markers with markers either included or excluded
