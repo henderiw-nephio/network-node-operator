@@ -3,6 +3,8 @@ package srlinux
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/pkg/cert"
@@ -38,29 +40,29 @@ const (
 	// volumes
 	//initialConfigVolMntPath  = "/tmp/initial-config"
 	//initialConfigCfgMapName  = "srlinux-initial-config"
-	defaultSecretUserNameKey      = "username"
-	defaultSecretPasswordKey      = "password"
-	defaultCertificateProfileName = "k8s-profile"
-	certificateVolName            = "certificate"
-	certificateVolMntPath         = "/k8s-certs"
-	initialConfigVolName          = "initial-config-volume"
-	variantsVolName               = "variants"
-	variantsVolMntPath            = "/tmp/topo"
-	variantsTemplateTempName      = "topo-template.yml"
-	variantsCfgMapName            = "srlinux-variants"
-	topomacVolName                = "topomac-script"
-	topomacVolMntPath             = "/tmp/topomac"
-	topomacCfgMapName             = "srlinux-topomac-script"
-	k8sEntrypointVolName          = "k8s-entrypoint"
-	k8sEntrypointVolMntPath       = "/k8s-entrypoint.sh"
-	k8sEntrypointVolMntSubPath    = "k8s-entrypoint.sh"
-	k8sEntrypointCfgMapName       = "srlinux-k8s-entrypoint"
-	fileMode777                   = 0o777
-	licenseCfgMapName             = "licenses.srl.nokia.com"
-	licensesVolName               = "license"
-	licenseFileName               = "license.key"
-	licenseMntPath                = "/opt/srlinux/etc/license.key"
-	licenseMntSubPath             = "license.key"
+	defaultSecretUserNameKey   = "username"
+	defaultSecretPasswordKey   = "password"
+	certificateProfileName     = "k8s-profile"
+	certificateVolName         = "serving-cert"
+	certificateVolMntPath      = "serving-certs"
+	initialConfigVolName       = "initial-config-volume"
+	variantsVolName            = "variants"
+	variantsVolMntPath         = "/tmp/topo"
+	variantsTemplateTempName   = "topo-template.yml"
+	variantsCfgMapName         = "srlinux-variants"
+	topomacVolName             = "topomac-script"
+	topomacVolMntPath          = "/tmp/topomac"
+	topomacCfgMapName          = "srlinux-topomac-script"
+	k8sEntrypointVolName       = "k8s-entrypoint"
+	k8sEntrypointVolMntPath    = "/k8s-entrypoint.sh"
+	k8sEntrypointVolMntSubPath = "k8s-entrypoint.sh"
+	k8sEntrypointCfgMapName    = "srlinux-k8s-entrypoint"
+	fileMode777                = 0o777
+	licenseCfgMapName          = "licenses.srl.nokia.com"
+	licensesVolName            = "license"
+	licenseFileName            = "license.key"
+	licenseMntPath             = "/opt/srlinux/etc/license.key"
+	licenseMntSubPath          = "license.key"
 )
 
 var (
@@ -149,7 +151,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: NokiaSRLinuxProvider}, secret); err != nil {
 		return err
 	}
-	certData, err := cert.GetCertificateData(certificateVolMntPath, defaultCertificateProfileName)
+	certData, err := cert.GetCertificateData(filepath.Join("tmp", certificateProfileName, certificateVolMntPath), certificateProfileName)
 	if err != nil {
 		return err
 	}
@@ -338,11 +340,11 @@ func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume
 			},
 		*/
 		{
-			Name: certificateVolName,
+			Name: strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName:  name,
-					DefaultMode: pointer.Int32(0755),
+					//DefaultMode: pointer.Int32(0755),
 				},
 			},
 		},
@@ -376,8 +378,8 @@ func getVolumeMounts(nodeConfig *srlv1alpha1.NodeConfig) []corev1.VolumeMount {
 			},
 		*/
 		{
-			Name:      certificateVolName,
-			MountPath: certificateVolMntPath,
+			Name:      strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
+			MountPath: filepath.Join("tmp", certificateProfileName, certificateVolMntPath),
 			ReadOnly:  true,
 		},
 	}
