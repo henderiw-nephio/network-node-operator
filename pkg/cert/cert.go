@@ -23,43 +23,80 @@ type CertData struct {
 	Key         string
 }
 
+/*
+	func GetCertificateData(dir, profile string) (*CertData, error) {
+		certData := &CertData{
+			ProfileName: profile,
+		}
+		fmt.Printf("getCertificateData: %s\n", dir)
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			fmt.Printf("getCertificateData error: %s\n", err.Error())
+			return nil, err
+		}
+		for _, f := range files {
+			fmt.Printf("filename: %s\n", f.Name())
+			if !f.IsDir() {
+				b, err := os.ReadFile(filepath.Join(dir, f.Name()))
+				if err != nil {
+					return nil, err
+				}
+				var found bool
+				if f.Name() == "ca.crt" {
+					certData.CA, found = getStringInBetween(string(b), caStartMarker, caEndMarker, true)
+					if !found {
+						return nil, fmt.Errorf("cannot get the ca string")
+					}
+				}
+				if f.Name() == "tls.crt" {
+					certData.Cert, found = getStringInBetween(string(b), certStartMarker, certEndMarker, true)
+					if !found {
+						return nil, fmt.Errorf("cannot get the cert string")
+					}
+				}
+				if f.Name() == "tls.key" {
+					certData.Key, found = getStringInBetween(string(b), keyStartMarker, keyEndMarker, false)
+					if !found {
+						return nil, fmt.Errorf("cannot get the key string")
+					}
+					certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
+				}
+			}
+		}
+		return certData, nil
+	}
+*/
 func GetCertificateData(dir, profile string) (*CertData, error) {
+
 	certData := &CertData{
 		ProfileName: profile,
 	}
 	fmt.Printf("getCertificateData: %s\n", dir)
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		fmt.Printf("getCertificateData error: %s\n", err.Error())
-		return nil, err
-	}
-	for _, f := range files {
-		fmt.Printf("filename: %s\n", f.Name())
-		if !f.IsDir() {
-			b, err := os.ReadFile(filepath.Join(dir, f.Name()))
-			if err != nil {
-				return nil, err
+
+	certFiles := []string{"ca.crt", "tls.crt", "tls.key"}
+	for _, certFile := range certFiles {
+		var found bool
+		b, err := os.ReadFile(filepath.Join(dir, certFile))
+		if err != nil {
+			return nil, err
+		}
+		switch certFile {
+		case "ca.crt":
+			certData.CA, found = getStringInBetween(string(b), caStartMarker, caEndMarker, true)
+			if !found {
+				return nil, fmt.Errorf("cannot get the ca string")
 			}
-			var found bool
-			if f.Name() == "ca.crt" {
-				certData.CA, found = getStringInBetween(string(b), caStartMarker, caEndMarker, true)
-				if !found {
-					return nil, fmt.Errorf("cannot get the ca string")
-				}
+		case "tls.crt":
+			certData.Cert, found = getStringInBetween(string(b), certStartMarker, certEndMarker, true)
+			if !found {
+				return nil, fmt.Errorf("cannot get the tls cert string")
 			}
-			if f.Name() == "tls.crt" {
-				certData.Cert, found = getStringInBetween(string(b), certStartMarker, certEndMarker, true)
-				if !found {
-					return nil, fmt.Errorf("cannot get the cert string")
-				}
+		case "tls.key":
+			certData.Key, found = getStringInBetween(string(b), keyStartMarker, keyEndMarker, false)
+			if !found {
+				return nil, fmt.Errorf("cannot get the tls key string")
 			}
-			if f.Name() == "tls.key" {
-				certData.Key, found = getStringInBetween(string(b), keyStartMarker, keyEndMarker, false)
-				if !found {
-					return nil, fmt.Errorf("cannot get the key string")
-				}
-				certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
-			}
+			certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
 		}
 	}
 	return certData, nil
