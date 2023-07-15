@@ -349,7 +349,7 @@ func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume
 			Name: strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName:  name,
+					SecretName: name,
 					//DefaultMode: pointer.Int32(0755),
 				},
 			},

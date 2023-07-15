@@ -92,7 +92,6 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 	}
 	return certData, nil
 
-	
 }
 
 // GetStringInBetween returns a string between the start/end markers with markers either included or excluded
