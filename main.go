@@ -22,7 +22,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/henderiw-nephio/network-node-operator/controllers/ctrlconfig"
 	_ "github.com/henderiw-nephio/network-node-operator/controllers/srlinux"
+	"github.com/henderiw-nephio/network-node-operator/pkg/node"
+	"github.com/henderiw-nephio/network-node-operator/pkg/node/srlinux"
 
 	"github.com/henderiw-nephio/network-node-operator/controllers"
 	"go.uber.org/zap/zapcore"
@@ -82,7 +85,9 @@ func main() {
 	for name, reconciler := range controllers.Reconcilers {
 		setupLog.Info("reconciler", "name", name, "enabled", IsReconcilerEnabled(name))
 		if IsReconcilerEnabled(name) {
-			if _, err := reconciler.SetupWithManager(ctx, mgr, nil); err != nil {
+			if _, err := reconciler.SetupWithManager(ctx, mgr, &ctrlconfig.ControllerConfig{
+				Noderegistry: registerSupportedNodeProviders(),
+			}); err != nil {
 				setupLog.Error(err, "cannot add controllers to manager")
 				os.Exit(1)
 			}
@@ -112,4 +117,11 @@ func IsReconcilerEnabled(reconcilerName string) bool {
 		return true
 	}
 	return false
+}
+
+func registerSupportedNodeProviders() node.NodeRegistry {
+	nodeRegistry := node.NewNodeRegistry()
+	srlinux.Register(nodeRegistry)
+
+	return nodeRegistry
 }

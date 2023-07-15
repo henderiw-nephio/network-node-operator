@@ -17,16 +17,7 @@ limitations under the License.
 package srlinux
 
 import (
-	"context"
-	"fmt"
-
-	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
-	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 /*
@@ -80,6 +71,7 @@ func (r *reconciler) getDeployment(ctx context.Context, cr *invv1alpha1.Node) (*
 }
 */
 
+/*
 func (r *reconciler) getPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
@@ -151,13 +143,17 @@ func (r *reconciler) checkVariants(ctx context.Context, cr *invv1alpha1.Node, mo
 	}
 	return nil
 }
+*/
 
-func getPodStatus(pod *corev1.Pod) (string, bool) {
+func getPodStatus(pod *corev1.Pod) ([]corev1.PodIP, string, bool) {
 	if len(pod.Status.ContainerStatuses) == 0 {
-		return "pod conditions empty", false
+		return nil, "pod conditions empty", false
 	}
 	if !pod.Status.ContainerStatuses[0].Ready {
-		return "pod not ready empty", false
+		return nil, "pod not ready empty", false
 	}
-	return "", true
+	if len(pod.Status.PodIPs) == 0 {
+		return nil, "no ip provided", false
+	}
+	return pod.Status.PodIPs, "", true
 }

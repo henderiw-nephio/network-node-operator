@@ -18,11 +18,15 @@ package srlinux
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
 	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/controllers"
+	"github.com/henderiw-nephio/network-node-operator/controllers/ctrlconfig"
+	"github.com/henderiw-nephio/network-node-operator/pkg/node"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/pkg/errors"
@@ -30,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -48,6 +53,11 @@ const (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c interface{}) (map[schema.GroupVersionKind]chan event.GenericEvent, error) {
+	cfg, ok := c.(*ctrlconfig.ControllerConfig)
+	if !ok {
+		return nil, fmt.Errorf("cannot initialize, expecting controllerConfig, got: %s", reflect.TypeOf(c).Name())
+	}
+
 	if err := invv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		return nil, err
 	}
@@ -55,9 +65,10 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 		return nil, err
 	}
 
-	r.APIPatchingApplicator = resource.NewAPIPatchingApplicator(mgr.GetClient())
+	r.Client = mgr.GetClient()
 	r.finalizer = resource.NewAPIFinalizer(mgr.GetClient(), finalizer)
 	r.scheme = mgr.GetScheme()
+	r.nodeRegistry = cfg.Noderegistry
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("SrlinuxNodeController").
@@ -69,10 +80,10 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 
 // reconciler reconciles a srlinux node object
 type reconciler struct {
-	scheme *runtime.Scheme
-	resource.APIPatchingApplicator
-	//pollInterval time.Duration
-	finalizer *resource.APIFinalizer
+	client.Client
+	scheme       *runtime.Scheme
+	finalizer    *resource.APIFinalizer
+	nodeRegistry node.NodeRegistry
 
 	l logr.Logger
 }
@@ -102,9 +113,10 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	if cr.Spec.Provider != nokiaSRLProvider {
-		// no need to further process, as this is meant for another provider
-		return ctrl.Result{}, nil
+	node, err := r.nodeRegistry.NewNodeOfProvider(cr.Spec.Provider)
+	if err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	pod := &corev1.Pod{}
@@ -115,23 +127,29 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		} else {
 			// create the Pod since it did not exist
-			pod, err := r.getPodSpec(ctx, cr)
+			pod, err := node.GetPodSpec(ctx, cr)
 			if err != nil {
 				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 			}
-			if err := r.Apply(ctx, pod); err != nil {
+			if err := r.Create(ctx, pod); err != nil {
 				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 			}
 		}
 	}
 	// TODO handle change
-
-	msg, ready := getPodStatus(pod)
+	
+	podIPs, msg, ready := getPodStatus(pod)
 	if !ready {
 		cr.SetConditions(srlv1alpha1.NotReady(msg))
 		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+
+	r.l.Info("pod ips", "ips", podIPs)
+	if err := node.SetInitialConfig(ctx, cr, podIPs); err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	cr.SetConditions(srlv1alpha1.Ready())

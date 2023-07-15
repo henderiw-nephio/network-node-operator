@@ -19,10 +19,12 @@ package ctrlconfig
 import (
 	"time"
 
+	"github.com/henderiw-nephio/network-node-operator/pkg/node"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
 type ControllerConfig struct {
-	Poll  time.Duration
-	Copts controller.Options
+	Poll         time.Duration
+	Copts        controller.Options
+	Noderegistry node.NodeRegistry
 }
