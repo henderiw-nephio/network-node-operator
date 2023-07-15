@@ -148,8 +148,9 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.l.Info("pod ips", "ips", podIPs)
 	if err := node.SetInitialConfig(ctx, cr, podIPs); err != nil {
+		r.l.Error(err, "cannot set initial config")
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	cr.SetConditions(srlv1alpha1.Ready())
