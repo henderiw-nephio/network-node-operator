@@ -35,6 +35,9 @@ FROM alpine:latest
 RUN apk add --update openssh
 WORKDIR /
 COPY --from=builder /workspace/manager .
-USER 65532:65532
-
+RUN addgroup -S appgroup
+RUN adduser -S -D -h /home/appuser appuser xyzgroup
+RUN chown -R appuser:appgroup /home/appuser
+USER appuser
+#USER 65532:65532
 ENTRYPOINT ["/manager"]
