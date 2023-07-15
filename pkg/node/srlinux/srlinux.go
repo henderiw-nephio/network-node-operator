@@ -42,7 +42,7 @@ const (
 	defaultSecretPasswordKey      = "password"
 	defaultCertificateProfileName = "k8s-profile"
 	certificateVolName            = "certificate"
-	certificateVolMntPath         = "k8s-certs"
+	certificateVolMntPath         = "/k8s-certs"
 	initialConfigVolName          = "initial-config-volume"
 	variantsVolName               = "variants"
 	variantsVolMntPath            = "/tmp/topo"
@@ -149,7 +149,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: NokiaSRLinuxProvider}, secret); err != nil {
 		return err
 	}
-	certData, err := cert.GetCertificateData("/"+certificateVolMntPath, defaultCertificateProfileName)
+	certData, err := cert.GetCertificateData(certificateVolMntPath, defaultCertificateProfileName)
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName:  name,
-					//DefaultMode: pointer.Int32(755),
+					DefaultMode: pointer.Int32(755),
 				},
 			},
 		},
