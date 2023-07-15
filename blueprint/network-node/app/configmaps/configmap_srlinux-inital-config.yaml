@@ -9,7 +9,7 @@ metadata:
   name: srlinux-initial-config
   annotations: {}
 data:
-  config.json: |
+  config.json: |-
     {
         "_preamble": {
             "header": {

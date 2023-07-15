@@ -27,6 +27,14 @@ rules:
   - create
   - delete
 - apiGroups:
+  - '*'
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - inv.nephio.org
   resources:
   - nodes
