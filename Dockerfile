@@ -39,6 +39,7 @@ RUN DEBIAN_FRONTEND=noninteractive \
   apt-get update \
   && apt-get install -y ssh \
   && apt-get install -y ethtool \
+  && apt-get install -y net-tools \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /
 COPY --from=builder /workspace/manager .
