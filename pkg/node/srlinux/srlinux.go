@@ -342,7 +342,7 @@ func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName:  name,
-					DefaultMode: pointer.Int32(420),
+					//DefaultMode: pointer.Int32(755),
 				},
 			},
 		},

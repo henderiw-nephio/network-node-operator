@@ -78,6 +78,7 @@ func GetCertificateData(dir, profile string) (*CertData, error) {
 		var found bool
 		b, err := os.ReadFile(filepath.Join(dir, certFile))
 		if err != nil {
+			fmt.Printf("getCertificateData: err: %s\n", err.Error())
 			return nil, err
 		}
 		switch certFile {
