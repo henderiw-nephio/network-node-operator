@@ -32,8 +32,14 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 #FROM gcr.io/distroless/static:nonroot
 FROM ubuntu:22.04
-#RUN apk add --update openssh
-RUN apt-get update && apt-get install -y ssh
+FROM ubuntu:22.04
+RUN echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/00-docker
+RUN echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/00-docker
+RUN DEBIAN_FRONTEND=noninteractive \
+  apt-get update \
+  && apt-get install -y ssh \
+  && apt-get install -y ethtool \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /
 COPY --from=builder /workspace/manager .
 #RUN addgroup -S admingroup
