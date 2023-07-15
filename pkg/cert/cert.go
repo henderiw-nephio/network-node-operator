@@ -27,8 +27,10 @@ func GetCertificateData(dir, profile string) (*CertData, error) {
 	certData := &CertData{
 		ProfileName: profile,
 	}
+	fmt.Printf("getCertificateData: %s\n", dir)
 	files, err := os.ReadDir(dir)
 	if err != nil {
+		fmt.Printf("getCertificateData error: %s\n", err.Error())
 		return nil, err
 	}
 	for _, f := range files {
