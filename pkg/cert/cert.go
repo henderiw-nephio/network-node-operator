@@ -69,7 +69,7 @@ type CertData struct {
 func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error) {
 	certFiles := []string{"ca.crt", "tls.crt", "tls.key"}
 	for _, certFile := range certFiles {
-		fmt.Println("certFile:\n", secret.Data[certFile])
+		fmt.Printf("certfile: %q\ndata: %q", certFile, string(secret.Data[certFile]))
 	}
 	return nil, fmt.Errorf("not implemented yet")
 
