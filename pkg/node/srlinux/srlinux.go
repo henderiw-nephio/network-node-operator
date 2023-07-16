@@ -201,7 +201,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	defer d.Close()
 
 	commands := []string{
-		"enter candidate\n",
+		"enter candidate private\n",
 		fmt.Sprintf("set / system tls server-profile %s\n", certData.ProfileName),
 		fmt.Sprintf("set / system tls server-profile %s authenticate-client false\n", certData.ProfileName),
 		fmt.Sprintf("set / system tls server-profile %s key %s\n", certData.ProfileName, certData.Key),
