@@ -119,50 +119,47 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	pod := &corev1.Pod{}
-	if err := r.Get(ctx, req.NamespacedName, pod); err != nil {
+	newpod, err := node.GetPodSpec(ctx, cr)
+	if err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+
+	var create bool
+	existingPod := &corev1.Pod{}
+	if err := r.Get(ctx, req.NamespacedName, existingPod); err != nil {
 		if resource.IgnoreNotFound(err) != nil {
 			// an error occurred
 			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-		} else {
-			// create the Pod since it did not exist
-			pod, err := node.GetPodSpec(ctx, cr)
-			if err != nil {
-				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-			}
-			if err := r.Create(ctx, pod); err != nil {
-				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-			}
 		}
+		// pod does not exist -> indicate to create it
+		create = true
 	} else {
-		// check if pod spec changed
-		newpod, err := node.GetPodSpec(ctx, cr)
-		if err != nil {
-			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-		}
 		r.l.Info("pod exists",
-			"oldHash", pod.GetAnnotations()[srlv1alpha1.RevisionHash],
+			"oldHash", existingPod.GetAnnotations()[srlv1alpha1.RevisionHash],
 			"newHash", newpod.GetAnnotations()[srlv1alpha1.RevisionHash],
 		)
-		if newpod.GetAnnotations()[srlv1alpha1.RevisionHash] != pod.GetAnnotations()[srlv1alpha1.RevisionHash] {
+		if newpod.GetAnnotations()[srlv1alpha1.RevisionHash] != existingPod.GetAnnotations()[srlv1alpha1.RevisionHash] {
 			// pod spec changed, since pods are immutable we delete and create the pod
 			r.l.Info("pod spec changed")
-			if err := r.Delete(ctx, pod); err != nil {
+			if err := r.Delete(ctx, existingPod); err != nil {
 				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 			}
-			if err := r.Create(ctx, newpod); err != nil {
-				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-			}
+			create = true
+		}
+	}
+
+	if create {
+		if err := r.Create(ctx, newpod); err != nil {
+			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		}
 	}
 
 	// at this stage the pod should exist
+	pod := &corev1.Pod{}
 	if err := r.Get(ctx, req.NamespacedName, pod); err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
