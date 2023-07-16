@@ -212,7 +212,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		"enter candidate\n",
 		fmt.Sprintf("set / system tls server-profile %s\n", certData.ProfileName),
 		fmt.Sprintf("set / system tls server-profile %s authenticate-client false\n", certData.ProfileName),
-		fmt.Sprintf("set / system tls server-profile %s key %s\n", certData.ProfileName, certData.Key),
+		fmt.Sprintf("set / system tls server-profile %s key \"%s\" \n", certData.ProfileName, certData.Key),
 		fmt.Sprintf("set / system tls server-profile %s certificate \"%s\" \n", certData.ProfileName, certData.Cert),
 		fmt.Sprintf("set / system tls server-profile %s trust-anchor \"%s\" \n", certData.ProfileName, certData.CA),
 		"set / system lldp admin state enable\n",
