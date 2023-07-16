@@ -74,18 +74,18 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 		switch certFile {
 		case "ca.crt":
 			fmt.Println("ca.crt", string(secret.Data[certFile]))
-			certData.CA, found = getStringInBetween(certFile, string(secret.Data[certFile]), certStartMarker, certStartMarker, true)
+			certData.CA, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
 			if !found {
 				return nil, fmt.Errorf("cannot get the ca string")
 			}
 			fmt.Println("certData.CA", certData.CA)
 		case "tls.crt":
-			certData.Cert, found = getStringInBetween(certFile, string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
+			certData.Cert, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls cert string")
 			}
 		case "tls.key":
-			certData.Key, found = getStringInBetween(certFile, string(secret.Data[certFile]), keyStartMarker, keyEndMarker, false)
+			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, false)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls key string")
 			}
@@ -97,7 +97,7 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 }
 
 // GetStringInBetween returns a string between the start/end markers with markers either included or excluded
-func getStringInBetween(certFile, str, start, end string, include bool) (result string, found bool) {
+func getStringInBetween(str, start, end string, include bool) (result string, found bool) {
 	// start index
 	sidx := strings.Index(str, start)
 	if sidx == -1 {
@@ -121,6 +121,5 @@ func getStringInBetween(certFile, str, start, end string, include bool) (result 
 		eidx += len(end)
 	}
 
-	fmt.Printf("fileName: %s, eidx: %d\n", certFile, eidx)
 	return newS[:eidx], true
 }
