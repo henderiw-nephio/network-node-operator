@@ -85,19 +85,12 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 				return nil, fmt.Errorf("cannot get the tls cert string")
 			}
 		case "tls.key":
-			decodedCertificateData, err := base64.StdEncoding.DecodeString(string(secret.Data[certFile]))
-			if err != nil {
-				log.Fatalf("Failed to decode certificate data: %v", err)
-			}
-
-			// Use the decoded certificate data as needed
-			fmt.Printf("Decoded Certificate Data: %s\n", decodedCertificateData)
-
-			certData.Key, found = getStringInBetween(string(decodedCertificateData), keyStartMarker, keyEndMarker, false)
+			fmt.Printf("tls.key:\n %s\n", secret.Data[certFile])
+			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, false)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls key string")
 			}
-			certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
+			//certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
 		}
 	}
 	return certData, nil
