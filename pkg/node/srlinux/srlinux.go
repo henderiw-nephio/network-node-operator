@@ -225,6 +225,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		"set / system p4rt-server network-instance mgmt admin-state enable\n",
 		fmt.Sprintf("set / system p4rt-server network-instance mgmt tls-profile %s \n", certData.ProfileName),
 		fmt.Sprintf("set / system banner login-banner \"%s\" \n", banner),
+		"set / network-instance mgmt protocols gribi admin-state enable\n",
 		"commit save",
 	}
 
