@@ -22,6 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const (
+	RevisionHash = "nephio.org/revision-hash"
+)
+
 type NodeConfigSpec struct {
 	// Model encodes SR Linux variant (ixr-d3, ixr-6e, etc)
 	Model *string `json:"model,omitempty"`

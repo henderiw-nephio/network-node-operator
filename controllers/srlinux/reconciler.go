@@ -137,8 +137,36 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 			}
 		}
+	} else {
+		// check if pod spec changed
+		newpod, err := node.GetPodSpec(ctx, cr)
+		if err != nil {
+			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+		}
+		r.l.Info("pod exists",
+			"oldHash", pod.GetAnnotations()[srlv1alpha1.RevisionHash],
+			"newHash", newpod.GetAnnotations()[srlv1alpha1.RevisionHash],
+		)
+		if newpod.GetAnnotations()[srlv1alpha1.RevisionHash] != pod.GetAnnotations()[srlv1alpha1.RevisionHash] {
+			// pod spec changed, since pods are immutable we delete and create the pod
+			r.l.Info("pod spec changed")
+			if err := r.Delete(ctx, pod); err != nil {
+				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+			}
+			if err := r.Create(ctx, newpod); err != nil {
+				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+			}
+		}
 	}
-	// TODO handle change
+
+	// at this stage the pod should exist
+	if err := r.Get(ctx, req.NamespacedName, pod); err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
 
 	podIPs, msg, ready := getPodStatus(pod)
 	if !ready {

@@ -2,6 +2,8 @@ package srlinux
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 
 	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
@@ -152,6 +154,12 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod
 			Volumes:                       getVolumes(cr.GetName(), nodeConfig),
 		},
 	}
+
+	hashString := getHash(d.Spec)
+	if len(d.GetAnnotations()) == 0 {
+		d.ObjectMeta.Annotations = map[string]string{}
+	}
+	d.ObjectMeta.Annotations[srlv1alpha1.RevisionHash] = hashString
 
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
 		return nil, err
@@ -467,4 +475,13 @@ func GetSelectorLabels(name string) map[string]string {
 	return map[string]string{
 		srlNodeLabelKey: name,
 	}
+}
+
+func getHash(x any) string {
+	b, err := json.Marshal(x)
+	if err != nil {
+		panic(err)
+	}
+	hash := sha256.Sum256(b)
+	return fmt.Sprintf("%x", hash)
 }
