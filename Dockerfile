@@ -30,22 +30,23 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-#FROM gcr.io/distroless/static:nonroot
-FROM ubuntu:22.04
-FROM ubuntu:22.04
-RUN echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/00-docker
-RUN echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/00-docker
-RUN DEBIAN_FRONTEND=noninteractive \
-  apt-get update \
-  && apt-get install -y ssh \
-  && apt-get install -y ethtool \
-  && apt-get install -y net-tools \
-  && rm -rf /var/lib/apt/lists/*
+FROM alpine:latest
+RUN apk add --update && \
+    apk add --no-cache openssh && \
+    apk add curl && \
+    apk add tcpdump && \
+    apk add iperf3 &&\
+    apk add netcat-openbsd && \
+    apk add ethtool && \
+    apk add bonding && \
+    apk add openssh && \
+    rm -rf /tmp/*/var/cache/apk/*
+RUN curl -sL https://get-gnmic.kmrd.dev | sh
 WORKDIR /
 COPY --from=builder /workspace/manager .
-#RUN addgroup -S admingroup
-#RUN adduser -S -D -h /home/admin admin admingroup
-#RUN chown -R admin:admingroup /home/admin
-#USER admin
-#USER 65532:65532
+RUN addgroup -S admingroup
+RUN adduser -S -D -h /home/admin admin admingroup
+RUN chown -R admin:admingroup /home/admin
+USER admin
+USER 65532:65532
 ENTRYPOINT ["/manager"]
