@@ -148,11 +148,13 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod
 func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []corev1.PodIP) error {
 	secret := &corev1.Secret{}
 	// we assume right now the default secret name is equal to the provider
+	// this provider username and password
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: NokiaSRLinuxProvider}, secret); err != nil {
 		return err
 	}
 
 	certSecret := &corev1.Secret{}
+	// this is used to provide certificate for the gnmi/gnsi/etc servers on the device
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.GetName()}, certSecret); err != nil {
 		return err
 	}
@@ -161,6 +163,8 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("certData: %v\n", *certData)
 
 	p, err := platform.NewPlatform(
 		scrapliGoSRLinuxKey,
@@ -196,7 +200,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	if err != nil {
 		return err
 	}
-	fmt.Printf("cmd input %s, response: %v\n", result.Failed, result.Responses)
+	fmt.Printf("cmd input %q, response: %v\n", commands, result)
 
 	return nil
 
