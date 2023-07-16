@@ -229,7 +229,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		"commit save",
 	}
 
-	fmt.Printf("commands:\n%v\n", commands)
+	//fmt.Printf("commands:\n%v\n", commands)
 
 	_, err = d.SendCommands(commands, opoptions.WithEager())
 	if err != nil {
