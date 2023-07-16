@@ -1,9 +1,7 @@
 package cert
 
 import (
-	"encoding/base64"
 	"fmt"
-	"log"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
