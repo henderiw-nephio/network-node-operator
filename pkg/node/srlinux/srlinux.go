@@ -164,7 +164,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		return err
 	}
 
-	fmt.Printf("certData: %v\n", *certData)
+	//fmt.Printf("certData: %v\n", *certData)
 
 	p, err := platform.NewPlatform(
 		scrapliGoSRLinuxKey,
