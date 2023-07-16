@@ -48,5 +48,5 @@ RUN addgroup -S admingroup
 RUN adduser -S -D -h /home/admin admin admingroup
 RUN chown -R admin:admingroup /home/admin
 USER admin
-USER 65532:65532
+#USER 65532:65532
 ENTRYPOINT ["/manager"]
