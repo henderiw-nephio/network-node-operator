@@ -73,12 +73,10 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 		var found bool
 		switch certFile {
 		case "ca.crt":
-			fmt.Println("ca.crt", string(secret.Data[certFile]))
 			certData.CA, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
 			if !found {
 				return nil, fmt.Errorf("cannot get the ca string")
 			}
-			fmt.Println("certData.CA", certData.CA)
 		case "tls.crt":
 			certData.Cert, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
 			if !found {

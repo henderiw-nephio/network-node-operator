@@ -196,11 +196,10 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		"commit save",
 	}
 
-	result, err := d.SendCommands(commands, opoptions.WithEager())
+	_, err = d.SendCommands(commands, opoptions.WithEager())
 	if err != nil {
 		return err
 	}
-	fmt.Printf("cmd input %q, response: %v\n", commands, result)
 
 	return nil
 
