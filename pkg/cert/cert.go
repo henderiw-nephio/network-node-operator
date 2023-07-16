@@ -1,7 +1,9 @@
 package cert
 
 import (
+	"encoding/base64"
 	"fmt"
+	"log"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -83,7 +85,15 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 				return nil, fmt.Errorf("cannot get the tls cert string")
 			}
 		case "tls.key":
-			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, false)
+			decodedCertificateData, err := base64.StdEncoding.DecodeString(string(secret.Data[certFile]))
+			if err != nil {
+				log.Fatalf("Failed to decode certificate data: %v", err)
+			}
+
+			// Use the decoded certificate data as needed
+			fmt.Printf("Decoded Certificate Data: %s\n", decodedCertificateData)
+
+			certData.Key, found = getStringInBetween(string(decodedCertificateData), keyStartMarker, keyEndMarker, false)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls key string")
 			}
