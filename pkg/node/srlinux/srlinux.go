@@ -3,8 +3,6 @@ package srlinux
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/pkg/cert"
@@ -43,9 +41,9 @@ const (
 	defaultSecretUserNameKey   = "username"
 	defaultSecretPasswordKey   = "password"
 	certificateProfileName     = "k8s-profile"
-	certificateVolName         = "serving-cert"
-	certificateVolMntPath      = "serving-certs"
-	initialConfigVolName       = "initial-config-volume"
+	//certificateVolName         = "serving-cert"
+	//certificateVolMntPath      = "serving-certs"
+	//initialConfigVolName       = "initial-config-volume"
 	variantsVolName            = "variants"
 	variantsVolMntPath         = "/tmp/topo"
 	variantsTemplateTempName   = "topo-template.yml"
@@ -382,15 +380,17 @@ func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume
 				},
 			},
 		*/
-		{
-			Name: strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: name,
-					//DefaultMode: pointer.Int32(0755),
+		/*
+			{
+				Name: strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: name,
+						//DefaultMode: pointer.Int32(0755),
+					},
 				},
 			},
-		},
+		*/
 	}
 	if nodeConfig.Spec.LicenseKey != nil {
 		vols = append(vols, getLicenseVolume(nodeConfig))
@@ -420,11 +420,13 @@ func getVolumeMounts(nodeConfig *srlv1alpha1.NodeConfig) []corev1.VolumeMount {
 				ReadOnly:  false,
 			},
 		*/
-		{
-			Name:      strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
-			MountPath: filepath.Join("tmp", certificateProfileName, certificateVolMntPath),
-			ReadOnly:  true,
-		},
+		/*
+			{
+				Name:      strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
+				MountPath: filepath.Join("tmp", certificateProfileName, certificateVolMntPath),
+				ReadOnly:  true,
+			},
+		*/
 	}
 
 	if nodeConfig.Spec.LicenseKey != nil {
