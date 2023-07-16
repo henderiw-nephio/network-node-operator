@@ -38,9 +38,9 @@ const (
 	// volumes
 	//initialConfigVolMntPath  = "/tmp/initial-config"
 	//initialConfigCfgMapName  = "srlinux-initial-config"
-	defaultSecretUserNameKey   = "username"
-	defaultSecretPasswordKey   = "password"
-	certificateProfileName     = "k8s-profile"
+	defaultSecretUserNameKey = "username"
+	defaultSecretPasswordKey = "password"
+	certificateProfileName   = "k8s-profile"
 	//certificateVolName         = "serving-cert"
 	//certificateVolMntPath      = "serving-certs"
 	//initialConfigVolName       = "initial-config-volume"
