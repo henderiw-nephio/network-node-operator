@@ -136,6 +136,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod
 		return nil, err
 	}
 
+	// validate if the model returned exists in the variant list
 	if err := r.checkVariants(ctx, cr, nodeConfig.GetModel(defaultSrlinuxVariant)); err != nil {
 		return nil, err
 	}
@@ -248,32 +249,49 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 }
 
 func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1alpha1.NodeConfig, error) {
-	// a parameterRef needs to be provided e.g. for the image or model that is to be deployed
-	paramRefSpec := &corev1.ObjectReference{
-		APIVersion: srlv1alpha1.GroupVersion.Identifier(),
-		Kind:       srlv1alpha1.NodeConfigKind,
-		Name:       cr.GetName(),
-		Namespace:  cr.GetNamespace(),
-	}
 	if cr.Spec.ParametersRef != nil {
-		paramRefSpec = cr.Spec.ParametersRef.DeepCopy()
+		// for srlinux we expect a specific apiversion and kind
+		paramRefSpec := cr.Spec.ParametersRef.DeepCopy()
+		if paramRefSpec.APIVersion != srlv1alpha1.GroupVersion.Identifier() ||
+			paramRefSpec.Kind != srlv1alpha1.NodeConfigKind {
+			return nil, fmt.Errorf("cannot deploy pod, apiVersion -want %s -got %s, kind -want %s -got %s, name must be specified -got %s",
+				srlv1alpha1.GroupVersion.Identifier(), paramRefSpec.APIVersion,
+				srlv1alpha1.NodeConfigKind, paramRefSpec.Kind,
+				paramRefSpec.Name,
+			)
+		}
+
+		// if the parameterRef name exists we expect a specific nodeConfig
+		if paramRefSpec.Name != "" {
+			nc := &srlv1alpha1.NodeConfig{}
+			if err := r.Get(ctx, types.NamespacedName{Name: paramRefSpec.Name, Namespace: cr.GetNamespace()}, nc); err != nil {
+				return nil, err
+			}
+			return nc, nil
+		}
 	}
 
-	if paramRefSpec.APIVersion != srlv1alpha1.GroupVersion.Identifier() ||
-		paramRefSpec.Kind != srlv1alpha1.NodeConfigKind ||
-		paramRefSpec.Name == "" {
-		return nil, fmt.Errorf("cannot deploy pod, apiVersion -want %s -got %s, kind -want %s -got %s, name must be specified -got %s",
-			srlv1alpha1.GroupVersion.Identifier(), paramRefSpec.APIVersion,
-			srlv1alpha1.NodeConfigKind, paramRefSpec.Kind,
-			paramRefSpec.Name,
-		)
+	opts := []client.ListOption{
+		client.InNamespace(cr.GetNamespace()),
 	}
-
-	nc := &srlv1alpha1.NodeConfig{}
-	if err := r.Get(ctx, types.NamespacedName{Name: paramRefSpec.Name, Namespace: paramRefSpec.Namespace}, nc); err != nil {
+	ncl := &srlv1alpha1.NodeConfigList{}
+	if err := r.List(ctx, ncl, opts...); err != nil {
 		return nil, err
 	}
-	return nc, nil
+
+	for _, nc := range ncl.Items {
+		// if there is a nodeconfig with the exact name of the node -> we return this nodeConfig
+		if nc.GetName() == cr.GetName() {
+			return &nc, nil
+		}
+		// if there is a nodeconfig with the name default -> we return this nodeConfig
+		if nc.GetName() == "default" {
+			return &nc, nil
+		}
+
+	}
+	// if nothing is found we return an empty nodeconfig
+	return &srlv1alpha1.NodeConfig{}, nil
 }
 
 func (r *srl) checkVariants(ctx context.Context, cr *invv1alpha1.Node, model string) error {
