@@ -63,6 +63,22 @@ const (
 	licenseFileName            = "license.key"
 	licenseMntPath             = "/opt/srlinux/etc/license.key"
 	licenseMntSubPath          = "license.key"
+	banner                     = `................................................................
+	:                  Welcome to Nokia SR Linux!                  :
+	:              Open Network OS for the NetOps era.             :
+	:                                                              :
+	:    This is a freely distributed official container image.    :
+	:                      Use it - Share it                       :
+	:                                                              :
+	: Get started: https://learn.srlinux.dev                       :
+	: Container:   https://go.srlinux.dev/container-image          :
+	: Docs:        https://doc.srlinux.dev/22-11                   :
+	: Rel. notes:  https://doc.srlinux.dev/rn22-11-2               :
+	: YANG:        https://yang.srlinux.dev/v22.11.2               :
+	: Discord:     https://go.srlinux.dev/discord                  :
+	: Contact:     https://go.srlinux.dev/contact-sales            :
+	................................................................
+	`
 )
 
 var (
@@ -193,6 +209,24 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		fmt.Sprintf("set / system tls server-profile %s key %s\n", certData.ProfileName, certData.Key),
 		fmt.Sprintf("set / system tls server-profile %s certificate \"%s\" \n", certData.ProfileName, certData.Cert),
 		fmt.Sprintf("set / system tls server-profile %s trust-anchor \"%s\" \n", certData.ProfileName, certData.CA),
+		"set / system lldp admin state enable",
+		"set / system gnmi-server admin-state enable",
+		"set / system gnmi-server rate-limit 65000",
+		"set / system gnmi-server trace-options [ common request response ]",
+		"set / system gnmi-server network-instance mgmt admin-state enable",
+		fmt.Sprintf("set / system gnmi-server network-instance mgmt tls-profile %s\n", certData.ProfileName),
+		"set / system gnmi-server network-instance mgmt unix-socket admin-state enable",
+		"set / system gribi-server admin-state enable",
+		"set / system gribi-server network-instance mgmt admin-state enable",
+		fmt.Sprintf("set / system gribi-server network-instance mgmt tls-profile %s\n", certData.ProfileName),
+		"set / system json-rpc-server admin-state enable",
+		"set / system json-rpc-server network-instance mgmt http admin-state enable",
+		"set / system json-rpc-server network-instance mgmt https admin-state enable",
+		fmt.Sprintf("set / system json-rpc-server network-instance mgmt https tls-profile %s\n", certData.ProfileName),
+		"set / system p4rt-server admin-state enable",
+		"set / system p4rt-server network-instance mgmt admin-state enable",
+		fmt.Sprintf("set / system p4rt-server network-instance mgmt tls-profile %s\n", certData.ProfileName),
+		fmt.Sprintf("set / system banner login-banner %s\n", banner),
 		"commit save",
 	}
 

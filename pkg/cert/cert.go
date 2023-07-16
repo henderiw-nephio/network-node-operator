@@ -83,12 +83,11 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 				return nil, fmt.Errorf("cannot get the tls cert string")
 			}
 		case "tls.key":
-			fmt.Printf("tls.key:\n %s\n", secret.Data[certFile])
-			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, false)
+			//fmt.Printf("tls.key:\n %s\n", secret.Data[certFile])
+			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, true)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls key string")
 			}
-			//certData.Key = strings.ReplaceAll(certData.Key, "\n", "")
 		}
 	}
 	return certData, nil
