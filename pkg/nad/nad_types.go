@@ -1,6 +1,10 @@
 package nad
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+)
 
 const (
 	CniVersion = "0.3.1"
@@ -61,4 +65,20 @@ func GetNadConfig(plugins []PluginConfigInterface) ([]byte, error) {
 		nadConfig.Plugins = append(nadConfig.Plugins, x)
 	}
 	return json.Marshal(nadConfig)
+}
+
+func GetNadAnnotation(nads []nadv1.NetworkAttachmentDefinition) ([]byte, error) {
+	a := []NadAnnotationEntry{}
+	for _, nad := range nads {
+		a = append(a, NadAnnotationEntry{
+			Name: nad.GetName(),
+		})
+	}
+	return json.Marshal(a)
+}
+
+type NadAnnotation []NadAnnotationEntry
+
+type NadAnnotationEntry struct {
+	Name string `json:"name,omitempty"`
 }

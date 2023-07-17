@@ -180,7 +180,12 @@ func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alph
 	return nads, nil
 }
 
-func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) (*corev1.Pod, error) {
+func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig, nads []nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
+	nadAnnotation, err := nad.GetNadAnnotation(nads)
+	if err != nil {
+		return nil, err
+	}
+	
 	d := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.GetName(),
@@ -201,6 +206,8 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alp
 		d.ObjectMeta.Annotations = map[string]string{}
 	}
 	d.ObjectMeta.Annotations[srlv1alpha1.RevisionHash] = hashString
+	d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot]= string(nadAnnotation)
+
 
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
 		return nil, err

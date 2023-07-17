@@ -156,7 +156,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	newPod, err := node.GetPodSpec(ctx, cr, nc)
+	newPod, err := node.GetPodSpec(ctx, cr, nc, nads)
 	if err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
