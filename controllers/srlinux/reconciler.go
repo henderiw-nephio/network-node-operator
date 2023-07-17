@@ -27,12 +27,15 @@ import (
 	"github.com/henderiw-nephio/network-node-operator/controllers"
 	"github.com/henderiw-nephio/network-node-operator/controllers/ctrlconfig"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node"
+	"github.com/henderiw-nephio/network/pkg/resources"
+	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -119,43 +122,43 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	newpod, err := node.GetPodSpec(ctx, cr)
+	nc, err := node.GetNodeConfig(ctx, cr)
 	if err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	var create bool
-	existingPod := &corev1.Pod{}
-	if err := r.Get(ctx, req.NamespacedName, existingPod); err != nil {
-		if resource.IgnoreNotFound(err) != nil {
-			// an error occurred
-			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-		}
-		// pod does not exist -> indicate to create it
-		create = true
-	} else {
-		r.l.Info("pod exists",
-			"oldHash", existingPod.GetAnnotations()[srlv1alpha1.RevisionHash],
-			"newHash", newpod.GetAnnotations()[srlv1alpha1.RevisionHash],
-		)
-		if newpod.GetAnnotations()[srlv1alpha1.RevisionHash] != existingPod.GetAnnotations()[srlv1alpha1.RevisionHash] {
-			// pod spec changed, since pods are immutable we delete and create the pod
-			r.l.Info("pod spec changed")
-			if err := r.Delete(ctx, existingPod); err != nil {
-				cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-				return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-			}
-			create = true
-		}
+	nads, err := node.GetNetworkAttachmentDefinitions(ctx, cr, nc)
+	if err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	if create {
-		if err := r.Create(ctx, newpod); err != nil {
-			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
-			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-		}
+	res := resources.New(
+		resource.NewAPIPatchingApplicator(r.Client),
+		resources.Config{
+			CR: cr,
+			Owns: []schema.GroupVersionKind{
+				nadv1.SchemeGroupVersion.WithKind(reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name()),
+			},
+		},
+	)
+	for _, nad := range nads {
+		res.AddNewResource(&nad)
+	}
+	if err := res.APIApply(ctx); err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+
+	newPod, err := node.GetPodSpec(ctx, cr, nc)
+	if err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+	if err := r.handlePodUpdate(ctx, cr, newPod); err != nil {
+		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	// at this stage the pod should exist
@@ -181,4 +184,39 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	r.l.Info("ready", "req", req)
 	cr.SetConditions(srlv1alpha1.Ready())
 	return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+}
+
+func (r *reconciler) handlePodUpdate(ctx context.Context, cr *invv1alpha1.Node, newPod *corev1.Pod) error {
+	var create bool
+	existingPod := &corev1.Pod{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      cr.GetName(),
+		Namespace: cr.GetNamespace(),
+	}, existingPod); err != nil {
+		if resource.IgnoreNotFound(err) != nil {
+			return err
+		}
+		// pod does not exist -> indicate to create it
+		create = true
+	} else {
+		r.l.Info("pod exists",
+			"oldHash", existingPod.GetAnnotations()[srlv1alpha1.RevisionHash],
+			"newHash", newPod.GetAnnotations()[srlv1alpha1.RevisionHash],
+		)
+		if newPod.GetAnnotations()[srlv1alpha1.RevisionHash] != existingPod.GetAnnotations()[srlv1alpha1.RevisionHash] {
+			// pod spec changed, since pods are immutable we delete and create the pod
+			r.l.Info("pod spec changed")
+			if err := r.Delete(ctx, existingPod); err != nil {
+				return err
+			}
+			create = true
+		}
+	}
+
+	if create {
+		if err := r.Create(ctx, newPod); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -5,10 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 
 	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/pkg/cert"
+	"github.com/henderiw-nephio/network-node-operator/pkg/nad"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node"
+	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/scrapli/scrapligo/driver/opoptions"
 	"github.com/scrapli/scrapligo/driver/options"
@@ -129,7 +133,7 @@ type srl struct {
 	scheme *runtime.Scheme
 }
 
-func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod, error) {
+func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
 	if err != nil {
@@ -140,7 +144,43 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod
 	if err := r.checkVariants(ctx, cr, nodeConfig.GetModel(defaultSrlinuxVariant)); err != nil {
 		return nil, err
 	}
+	return nodeConfig, nil
+}
 
+func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) ([]nadv1.NetworkAttachmentDefinition, error) {
+	// todo check node model and get interfaces from the model
+	nads := []nadv1.NetworkAttachmentDefinition{}
+	ifNames := []string{"e1-1", "e1-2"}
+	for _, ifName := range ifNames {
+		b, err := nad.GetNadConfig([]nad.PluginConfigInterface{
+			nad.WirePlugin{
+				PluginCniType: nad.PluginCniType{
+					Type: nad.TuningPluginType,
+				},
+				InterfaceName: ifName,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		nads = append(nads, nadv1.NetworkAttachmentDefinition{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: nadv1.SchemeGroupVersion.Identifier(),
+				Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.GetNamespace(),
+				Name:      strings.Join([]string{cr.GetName(), ifName}, "-"),
+			},
+			Spec: nadv1.NetworkAttachmentDefinitionSpec{
+				Config: string(b),
+			},
+		})
+	}
+	return nads, nil
+}
+
+func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) (*corev1.Pod, error) {
 	d := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.GetName(),
@@ -148,11 +188,11 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node) (*corev1.Pod
 		},
 		Spec: corev1.PodSpec{
 			//InitContainers:                []corev1.Container{},
-			Containers:                    getContainers(cr.GetName(), nodeConfig),
+			Containers:                    getContainers(cr.GetName(), nc),
 			TerminationGracePeriodSeconds: pointer.Int64(terminationGracePeriodSeconds),
 			NodeSelector:                  map[string]string{},
 			Affinity:                      getAffinity(cr.GetName()),
-			Volumes:                       getVolumes(cr.GetName(), nodeConfig),
+			Volumes:                       getVolumes(cr.GetName(), nc),
 		},
 	}
 
