@@ -59,6 +59,18 @@ rules:
   - create
   - delete
 - apiGroups:
+  - k8s.cni.cncf.io/v1
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - create
+  - delete
+- apiGroups:
   - srlinux.nokia.com
   resources:
   - nodeconfigs

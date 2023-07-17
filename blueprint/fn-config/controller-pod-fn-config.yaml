@@ -24,9 +24,9 @@ spec:
       - apiGroups: ["inv.nephio.org"]
         resources: [nodes/status]
         verbs: [get, list, watch, update, patch, create, delete]
-      #- apiGroups: [apps]
-      #  resources: [deployments]
-      #  verbs: [get, list, watch, update, patch, create, delete]
+      - apiGroups: [k8s.cni.cncf.io/v1]
+        resources: [network-attachment-definitions]
+        verbs: [get, list, watch, update, patch, create, delete]
     leader-election:
       permissions:
       - apiGroups: ["*"]
