@@ -147,8 +147,9 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		},
 	)
 	for _, nad := range nads {
+		n := nad
 		r.l.Info("nad info", "name", nad.GetName())
-		res.AddNewResource(&nad)
+		res.AddNewResource(&n)
 	}
 	if err := res.APIApply(ctx); err != nil {
 		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
