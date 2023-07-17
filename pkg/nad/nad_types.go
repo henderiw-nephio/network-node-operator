@@ -67,7 +67,7 @@ func GetNadConfig(plugins []PluginConfigInterface) ([]byte, error) {
 	return json.Marshal(nadConfig)
 }
 
-func GetNadAnnotation(nads []nadv1.NetworkAttachmentDefinition) ([]byte, error) {
+func GetNadAnnotation(nads []*nadv1.NetworkAttachmentDefinition) ([]byte, error) {
 	a := []NadAnnotationEntry{}
 	for _, nad := range nads {
 		a = append(a, NadAnnotationEntry{

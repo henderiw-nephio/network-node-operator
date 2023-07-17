@@ -147,9 +147,9 @@ func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1al
 	return nodeConfig, nil
 }
 
-func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) ([]nadv1.NetworkAttachmentDefinition, error) {
+func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {
 	// todo check node model and get interfaces from the model
-	nads := []nadv1.NetworkAttachmentDefinition{}
+	nads := []*nadv1.NetworkAttachmentDefinition{}
 	ifNames := []string{"e1-1", "e1-2"}
 	for _, ifName := range ifNames {
 		b, err := nad.GetNadConfig([]nad.PluginConfigInterface{
@@ -163,7 +163,8 @@ func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alph
 		if err != nil {
 			return nil, err
 		}
-		nads = append(nads, nadv1.NetworkAttachmentDefinition{
+
+		n := &nadv1.NetworkAttachmentDefinition{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: nadv1.SchemeGroupVersion.Identifier(),
 				Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
@@ -175,17 +176,21 @@ func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alph
 			Spec: nadv1.NetworkAttachmentDefinitionSpec{
 				Config: string(b),
 			},
-		})
+		}
+		if err := ctrl.SetControllerReference(cr, n, r.scheme); err != nil {
+			return nil, err
+		}
+		nads = append(nads, n)
 	}
 	return nads, nil
 }
 
-func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig, nads []nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
+func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig, nads []*nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
 	nadAnnotation, err := nad.GetNadAnnotation(nads)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	d := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.GetName(),
@@ -206,8 +211,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alp
 		d.ObjectMeta.Annotations = map[string]string{}
 	}
 	d.ObjectMeta.Annotations[srlv1alpha1.RevisionHash] = hashString
-	d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot]= string(nadAnnotation)
-
+	d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
 
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
 		return nil, err
