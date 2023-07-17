@@ -147,6 +147,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		},
 	)
 	for _, nad := range nads {
+		r.l.Info("nad info", "name", nad.GetName())
 		res.AddNewResource(&nad)
 	}
 	if err := res.APIApply(ctx); err != nil {

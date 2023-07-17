@@ -155,7 +155,7 @@ func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alph
 		b, err := nad.GetNadConfig([]nad.PluginConfigInterface{
 			nad.WirePlugin{
 				PluginCniType: nad.PluginCniType{
-					Type: nad.TuningPluginType,
+					Type: nad.WirePluginType,
 				},
 				InterfaceName: ifName,
 			},
