@@ -59,7 +59,7 @@ rules:
   - create
   - delete
 - apiGroups:
-  - k8s.cni.cncf.io/v1
+  - k8s.cni.cncf.io
   resources:
   - network-attachment-definitions
   verbs:
