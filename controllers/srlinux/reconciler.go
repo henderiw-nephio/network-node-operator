@@ -67,6 +67,9 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	if err := srlv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		return nil, err
 	}
+	if err := nadv1.AddToScheme(mgr.GetScheme()); err != nil {
+		return nil, err
+	}
 
 	r.Client = mgr.GetClient()
 	r.finalizer = resource.NewAPIFinalizer(mgr.GetClient(), finalizer)
