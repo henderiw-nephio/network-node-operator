@@ -77,17 +77,20 @@ func GetCertificateData(secret *corev1.Secret, profile string) (*CertData, error
 			if !found {
 				return nil, fmt.Errorf("cannot get the ca string")
 			}
+			certData.CA = strings.TrimSpace(certData.CA)
 		case "tls.crt":
 			certData.Cert, found = getStringInBetween(string(secret.Data[certFile]), certStartMarker, certEndMarker, true)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls cert string")
 			}
+			certData.Cert = strings.TrimSpace(certData.Cert)
 		case "tls.key":
 			fmt.Printf("tls.key:\n %s\n", secret.Data[certFile])
 			certData.Key, found = getStringInBetween(string(secret.Data[certFile]), keyStartMarker, keyEndMarker, true)
 			if !found {
 				return nil, fmt.Errorf("cannot get the tls key string")
 			}
+			certData.Key = strings.TrimSpace(certData.Key)
 		}
 	}
 	return certData, nil
