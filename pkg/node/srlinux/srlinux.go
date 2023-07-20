@@ -52,14 +52,14 @@ const (
 	variantsVolName            = "variants"
 	variantsVolMntPath         = "/tmp/topo"
 	variantsTemplateTempName   = "topo-template.yml"
-	variantsCfgMapName         = "srlinux-variants"
+	variantsCfgMapName         = "srlinux.nokia.com-variants"
 	topomacVolName             = "topomac-script"
 	topomacVolMntPath          = "/tmp/topomac"
-	topomacCfgMapName          = "srlinux-topomac-script"
+	topomacCfgMapName          = "srlinux.nokia.com-topomac-script"
 	k8sEntrypointVolName       = "k8s-entrypoint"
 	k8sEntrypointVolMntPath    = "/k8s-entrypoint.sh"
 	k8sEntrypointVolMntSubPath = "k8s-entrypoint.sh"
-	k8sEntrypointCfgMapName    = "srlinux-k8s-entrypoint"
+	k8sEntrypointCfgMapName    = "srlinux.nokia.com-k8s-entrypoint"
 	fileMode777                = 0o777
 	licenseCfgMapName          = "licenses.srl.nokia.com"
 	licensesVolName            = "license"
@@ -146,12 +146,15 @@ func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 	return nodeConfig, nil
 }
 
-func (r *srl) GetInterfaces(nc *invv1alpha1.NodeConfig) ([]node.Interface, error) {
-	x, ok := models[nc.GetModel(defaultSrlinuxVariant)]
-	if !ok {
-		return nil, fmt.Errorf("model not initialized: got: %s", nc.GetModel(defaultSrlinuxVariant))
+func (r *srl) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
+	nm := &invv1alpha1.NodeModel{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSrlinuxVariant)),
+		Namespace: nc.GetNamespace(),
+	}, nm); err != nil {
+		return nil, err
 	}
-	return x, nil
+	return nm, nil
 }
 
 func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {

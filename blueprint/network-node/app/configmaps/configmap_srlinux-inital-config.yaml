@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: srlinux-initial-config
+  name: srlinux.nokia.com-initial-config
   annotations: {}
 data:
   config.json: |-
