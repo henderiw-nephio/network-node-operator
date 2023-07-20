@@ -147,6 +147,14 @@ func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1al
 	return nodeConfig, nil
 }
 
+func (r *srl) GetInterfaces(nc *srlv1alpha1.NodeConfig) ([]node.Interface, error) {
+	x, ok := models[nc.GetModel(defaultSrlinuxVariant)]
+	if !ok {
+		return nil, fmt.Errorf("model not initialized: got: %s", nc.GetModel(defaultSrlinuxVariant))
+	}
+	return x, nil
+}
+
 func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {
 	// todo check node model and get interfaces from the model
 	nads := []*nadv1.NetworkAttachmentDefinition{}
