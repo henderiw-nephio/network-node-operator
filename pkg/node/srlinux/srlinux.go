@@ -352,7 +352,11 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 
 	}
 	// if nothing is found we return an empty nodeconfig
-	return &invv1alpha1.NodeConfig{}, nil
+	return &invv1alpha1.NodeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cr.GetNamespace(),
+		},
+	}, nil
 }
 
 func (r *srl) checkVariants(ctx context.Context, cr *invv1alpha1.Node, model string) error {
