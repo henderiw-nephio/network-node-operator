@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 
-	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/pkg/cert"
 	"github.com/henderiw-nephio/network-node-operator/pkg/nad"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node"
@@ -27,8 +26,8 @@ import (
 )
 
 const (
-	NokiaSRLinuxProvider    = "srlinux.nokia.com"
-	srlNodeLabelKey         = srlv1alpha1.Group + "/" + "node"
+	NokiaSRLinuxProvider = "srlinux.nokia.com"
+	//srlNodeLabelKey         = invv1alpha1.GroupVersion.Group + "/" + "node"
 	defaultSRLinuxImageName = "ghcr.io/nokia/srlinux:latest"
 	defaultSrlinuxVariant   = "ixrd3l"
 	scrapliGoSRLinuxKey     = "nokia_srl"
@@ -133,7 +132,7 @@ type srl struct {
 	scheme *runtime.Scheme
 }
 
-func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1alpha1.NodeConfig, error) {
+func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
 	if err != nil {
@@ -147,7 +146,7 @@ func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1al
 	return nodeConfig, nil
 }
 
-func (r *srl) GetInterfaces(nc *srlv1alpha1.NodeConfig) ([]node.Interface, error) {
+func (r *srl) GetInterfaces(nc *invv1alpha1.NodeConfig) ([]node.Interface, error) {
 	x, ok := models[nc.GetModel(defaultSrlinuxVariant)]
 	if !ok {
 		return nil, fmt.Errorf("model not initialized: got: %s", nc.GetModel(defaultSrlinuxVariant))
@@ -155,7 +154,7 @@ func (r *srl) GetInterfaces(nc *srlv1alpha1.NodeConfig) ([]node.Interface, error
 	return x, nil
 }
 
-func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {
+func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {
 	// todo check node model and get interfaces from the model
 	nads := []*nadv1.NetworkAttachmentDefinition{}
 	ifNames := []string{"e1-1", "e1-2"}
@@ -193,7 +192,7 @@ func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alph
 	return nads, nil
 }
 
-func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alpha1.NodeConfig, nads []*nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
+func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig, nads []*nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
 	nadAnnotation, err := nad.GetNadAnnotation(nads)
 	if err != nil {
 		return nil, err
@@ -218,7 +217,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *srlv1alp
 	if len(d.GetAnnotations()) == 0 {
 		d.ObjectMeta.Annotations = map[string]string{}
 	}
-	d.ObjectMeta.Annotations[srlv1alpha1.RevisionHash] = hashString
+	d.ObjectMeta.Annotations[invv1alpha1.RevisionHash] = hashString
 	d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
 
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
@@ -307,22 +306,22 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 
 }
 
-func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1alpha1.NodeConfig, error) {
+func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	if cr.Spec.ParametersRef != nil {
 		// for srlinux we expect a specific apiversion and kind
 		paramRefSpec := cr.Spec.ParametersRef.DeepCopy()
-		if paramRefSpec.APIVersion != srlv1alpha1.GroupVersion.Identifier() ||
-			paramRefSpec.Kind != srlv1alpha1.NodeConfigKind {
+		if paramRefSpec.APIVersion != invv1alpha1.GroupVersion.Identifier() ||
+			paramRefSpec.Kind != invv1alpha1.NodeConfigKind {
 			return nil, fmt.Errorf("cannot deploy pod, apiVersion -want %s -got %s, kind -want %s -got %s, name must be specified -got %s",
-				srlv1alpha1.GroupVersion.Identifier(), paramRefSpec.APIVersion,
-				srlv1alpha1.NodeConfigKind, paramRefSpec.Kind,
+				invv1alpha1.GroupVersion.Identifier(), paramRefSpec.APIVersion,
+				invv1alpha1.NodeConfigKind, paramRefSpec.Kind,
 				paramRefSpec.Name,
 			)
 		}
 
 		// if the parameterRef name exists we expect a specific nodeConfig
 		if paramRefSpec.Name != "" {
-			nc := &srlv1alpha1.NodeConfig{}
+			nc := &invv1alpha1.NodeConfig{}
 			if err := r.Get(ctx, types.NamespacedName{Name: paramRefSpec.Name, Namespace: cr.GetNamespace()}, nc); err != nil {
 				return nil, err
 			}
@@ -333,7 +332,7 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1al
 	opts := []client.ListOption{
 		client.InNamespace(cr.GetNamespace()),
 	}
-	ncl := &srlv1alpha1.NodeConfigList{}
+	ncl := &invv1alpha1.NodeConfigList{}
 	if err := r.List(ctx, ncl, opts...); err != nil {
 		return nil, err
 	}
@@ -350,7 +349,7 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*srlv1al
 
 	}
 	// if nothing is found we return an empty nodeconfig
-	return &srlv1alpha1.NodeConfig{}, nil
+	return &invv1alpha1.NodeConfig{}, nil
 }
 
 func (r *srl) checkVariants(ctx context.Context, cr *invv1alpha1.Node, model string) error {
@@ -364,7 +363,7 @@ func (r *srl) checkVariants(ctx context.Context, cr *invv1alpha1.Node, model str
 	return nil
 }
 
-func getContainers(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Container {
+func getContainers(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Container {
 	return []corev1.Container{{
 		Name:            name,
 		Image:           nodeConfig.GetImage(defaultSRLinuxImageName),
@@ -416,7 +415,7 @@ func getAffinity(name string) *corev1.Affinity {
 	}
 }
 
-func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume {
+func getVolumes(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Volume {
 	vols := []corev1.Volume{
 		{
 			Name: variantsVolName,
@@ -485,7 +484,7 @@ func getVolumes(name string, nodeConfig *srlv1alpha1.NodeConfig) []corev1.Volume
 	return vols
 }
 
-func getVolumeMounts(nodeConfig *srlv1alpha1.NodeConfig) []corev1.VolumeMount {
+func getVolumeMounts(nodeConfig *invv1alpha1.NodeConfig) []corev1.VolumeMount {
 	vms := []corev1.VolumeMount{
 		{
 			Name:      variantsVolName,
@@ -531,7 +530,7 @@ func getLicenseVolumeMount() corev1.VolumeMount {
 	}
 }
 
-func getLicenseVolume(nodeConfig *srlv1alpha1.NodeConfig) corev1.Volume {
+func getLicenseVolume(nodeConfig *invv1alpha1.NodeConfig) corev1.Volume {
 	return corev1.Volume{
 		Name: licensesVolName,
 		VolumeSource: corev1.VolumeSource{
@@ -548,11 +547,13 @@ func getLicenseVolume(nodeConfig *srlv1alpha1.NodeConfig) corev1.Volume {
 	}
 }
 
+/*
 func GetSelectorLabels(name string) map[string]string {
 	return map[string]string{
 		srlNodeLabelKey: name,
 	}
 }
+*/
 
 func getHash(x any) string {
 	b, err := json.Marshal(x)

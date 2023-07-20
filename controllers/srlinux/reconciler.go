@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	srlv1alpha1 "github.com/henderiw-nephio/network-node-operator/apis/srlinux/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/controllers"
 	"github.com/henderiw-nephio/network-node-operator/controllers/ctrlconfig"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node"
@@ -62,9 +62,6 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	}
 
 	if err := invv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-		return nil, err
-	}
-	if err := srlv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		return nil, err
 	}
 	if err := nadv1.AddToScheme(mgr.GetScheme()); err != nil {
@@ -112,7 +109,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if resource.WasDeleted(cr) {
 		if err := r.finalizer.RemoveFinalizer(ctx, cr); err != nil {
 			r.l.Error(err, "cannot remove finalizer")
-			cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+			cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 			return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		}
 		r.l.Info("Successfully deleted resource")
@@ -121,19 +118,19 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	node, err := r.nodeRegistry.NewNodeOfProvider(cr.Spec.Provider, r.Client, r.scheme)
 	if err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	nc, err := node.GetNodeConfig(ctx, cr)
 	if err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	nads, err := node.GetNetworkAttachmentDefinitions(ctx, cr, nc)
 	if err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
@@ -151,42 +148,42 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		res.AddNewResource(nad)
 	}
 	if err := res.APIApply(ctx); err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	newPod, err := node.GetPodSpec(ctx, cr, nc, nads)
 	if err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 	if err := r.handlePodUpdate(ctx, cr, newPod); err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	// at this stage the pod should exist
 	pod := &corev1.Pod{}
 	if err := r.Get(ctx, req.NamespacedName, pod); err != nil {
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	podIPs, msg, ready := getPodStatus(pod)
 	if !ready {
-		cr.SetConditions(srlv1alpha1.NotReady(msg))
+		cr.SetConditions(resourcev1alpha1.NotReady(msg))
 		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	r.l.Info("pod ips", "ips", podIPs)
 	if err := node.SetInitialConfig(ctx, cr, podIPs); err != nil {
 		r.l.Error(err, "cannot set initial config")
-		cr.SetConditions(srlv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	r.l.Info("ready", "req", req)
-	cr.SetConditions(srlv1alpha1.Ready())
+	cr.SetConditions(resourcev1alpha1.Ready())
 	return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 }
 
@@ -204,10 +201,10 @@ func (r *reconciler) handlePodUpdate(ctx context.Context, cr *invv1alpha1.Node, 
 		create = true
 	} else {
 		r.l.Info("pod exists",
-			"oldHash", existingPod.GetAnnotations()[srlv1alpha1.RevisionHash],
-			"newHash", newPod.GetAnnotations()[srlv1alpha1.RevisionHash],
+			"oldHash", existingPod.GetAnnotations()[invv1alpha1.RevisionHash],
+			"newHash", newPod.GetAnnotations()[invv1alpha1.RevisionHash],
 		)
-		if newPod.GetAnnotations()[srlv1alpha1.RevisionHash] != existingPod.GetAnnotations()[srlv1alpha1.RevisionHash] {
+		if newPod.GetAnnotations()[invv1alpha1.RevisionHash] != existingPod.GetAnnotations()[invv1alpha1.RevisionHash] {
 			// pod spec changed, since pods are immutable we delete and create the pod
 			r.l.Info("pod spec changed")
 			if err := r.Delete(ctx, existingPod); err != nil {
