@@ -310,27 +310,19 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 }
 
 func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
-	if cr.Spec.ParametersRef != nil {
-		// for srlinux we expect a specific apiversion and kind
-		paramRefSpec := cr.Spec.ParametersRef.DeepCopy()
-		if paramRefSpec.APIVersion != invv1alpha1.GroupVersion.Identifier() ||
-			paramRefSpec.Kind != invv1alpha1.NodeConfigKind {
-			return nil, fmt.Errorf("cannot deploy pod, apiVersion -want %s -got %s, kind -want %s -got %s, name must be specified -got %s",
-				invv1alpha1.GroupVersion.Identifier(), paramRefSpec.APIVersion,
-				invv1alpha1.NodeConfigKind, paramRefSpec.Kind,
-				paramRefSpec.Name,
-			)
-		}
 
-		// if the parameterRef name exists we expect a specific nodeConfig
-		if paramRefSpec.Name != "" {
-			nc := &invv1alpha1.NodeConfig{}
-			if err := r.Get(ctx, types.NamespacedName{Name: paramRefSpec.Name, Namespace: cr.GetNamespace()}, nc); err != nil {
-				return nil, err
-			}
-			return nc, nil
+	if cr.Spec.NodeConfig != nil && cr.Spec.NodeConfig.Name != "" {
+		nc := &invv1alpha1.NodeConfig{}
+		if err := r.Get(ctx, types.NamespacedName{Name: cr.Spec.NodeConfig.Name, Namespace: cr.GetNamespace()}, nc); err != nil {
+			return nil, err
 		}
+		return nc, nil
+
 	}
+	// the nodeConfig was not provided, we list all nodeConfigs in the cr namespace
+	// we check if there is a nodeconfig with the name equal to the cr name + the provider matches
+	// if still not found we look at a nodeconfig with name default that matches the provider
+	// if still not found we return an empty nodeConfig, which populates the defaults
 
 	opts := []client.ListOption{
 		client.InNamespace(cr.GetNamespace()),
@@ -342,11 +334,13 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 
 	for _, nc := range ncl.Items {
 		// if there is a nodeconfig with the exact name of the node -> we return this nodeConfig
-		if nc.GetName() == cr.GetName() {
+		if nc.GetName() == cr.GetName() && cr.Spec.Provider == nc.Spec.Provider {
 			return &nc, nil
 		}
+	}
+	for _, nc := range ncl.Items {
 		// if there is a nodeconfig with the name default -> we return this nodeConfig
-		if nc.GetName() == "default" {
+		if nc.GetName() == "default" && cr.Spec.Provider == nc.Spec.Provider {
 			return &nc, nil
 		}
 
