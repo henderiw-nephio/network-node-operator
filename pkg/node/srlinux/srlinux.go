@@ -146,6 +146,15 @@ func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 	return nodeConfig, nil
 }
 
+func (r *srl) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfig) *corev1.ObjectReference {
+	return &corev1.ObjectReference{
+		APIVersion: invv1alpha1.NodeKindAPIVersion,
+		Kind:       invv1alpha1.NodeModelKind,
+		Name:       fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSrlinuxVariant)),
+		Namespace:  nc.GetNamespace(),
+	}
+}
+
 func (r *srl) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
 	nm := &invv1alpha1.NodeModel{}
 	if err := r.Get(ctx, types.NamespacedName{
