@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -230,7 +231,9 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 		d.ObjectMeta.Annotations = map[string]string{}
 	}
 	d.ObjectMeta.Annotations[invv1alpha1.RevisionHash] = hashString
-	d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
+	if os.Getenv("ENABLE_NAD") == "true" {
+		d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
+	}
 
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
 		return nil, err

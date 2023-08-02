@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/henderiw-nephio/network-node-operator/controllers/ctrlconfig"
-	_ "github.com/henderiw-nephio/network-node-operator/controllers/srlinux"
+	_ "github.com/henderiw-nephio/network-node-operator/controllers/nodedeployer"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node/srlinux"
 

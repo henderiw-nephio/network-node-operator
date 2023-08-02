@@ -111,7 +111,9 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.hostIP
-        - name: ENABLE_SRLINUX
+        - name: ENABLE_NODEDEPLOYER
           value: "true"
+        - name: ENABLE_NAD
+          value: "false"
   services:
     

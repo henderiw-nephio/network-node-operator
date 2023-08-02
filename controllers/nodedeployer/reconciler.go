@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package srlinux
+package nodedeployer
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
-	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
 	"github.com/henderiw-nephio/network-node-operator/controllers"
 	"github.com/henderiw-nephio/network-node-operator/controllers/ctrlconfig"
 	"github.com/henderiw-nephio/network-node-operator/pkg/node"
@@ -31,6 +31,7 @@ import (
 	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,12 +44,11 @@ import (
 )
 
 func init() {
-	controllers.Register("srlinux", &reconciler{})
+	controllers.Register("nodedeployer", &reconciler{})
 }
 
 const (
-	finalizer        = "srlinux.nokia.com/finalizer"
-	nokiaSRLProvider = "srlinux.nokia.com"
+	finalizer = "nodedeployer.nephio.com/finalizer"
 	// errors
 	errGetCr        = "cannot get cr"
 	errUpdateStatus = "cannot update status"
@@ -74,7 +74,7 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	r.nodeRegistry = cfg.Noderegistry
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
-		Named("SrlinuxNodeController").
+		Named("NodeDeployerController").
 		For(&invv1alpha1.Node{}).
 		Owns(&corev1.Pod{}).
 		Complete(r)
@@ -143,10 +143,14 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			},
 		},
 	)
-	for _, nad := range nads {
-		r.l.Info("nad info", "name", nad.GetName())
-		res.AddNewResource(nad)
+
+	if os.Getenv("ENABLE_NAD") == "true" {
+		for _, nad := range nads {
+			r.l.Info("nad info", "name", nad.GetName())
+			res.AddNewResource(nad)
+		}
 	}
+
 	if err := res.APIApply(ctx); err != nil {
 		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
@@ -220,4 +224,17 @@ func (r *reconciler) handlePodUpdate(ctx context.Context, cr *invv1alpha1.Node, 
 		}
 	}
 	return nil
+}
+
+func getPodStatus(pod *corev1.Pod) ([]corev1.PodIP, string, bool) {
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return nil, "pod conditions empty", false
+	}
+	if !pod.Status.ContainerStatuses[0].Ready {
+		return nil, "pod not ready empty", false
+	}
+	if len(pod.Status.PodIPs) == 0 {
+		return nil, "no ip provided", false
+	}
+	return pod.Status.PodIPs, "", true
 }
