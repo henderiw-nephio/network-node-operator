@@ -49,6 +49,14 @@ rules:
 - apiGroups:
   - inv.nephio.org
   resources:
+  - nodeconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - inv.nephio.org
+  resources:
   - nodes/status
   verbs:
   - get
