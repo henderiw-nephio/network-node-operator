@@ -231,6 +231,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 		d.ObjectMeta.Annotations = map[string]string{}
 	}
 	d.ObjectMeta.Annotations[invv1alpha1.RevisionHash] = hashString
+	d.ObjectMeta.Annotations[invv1alpha1.NephioWiringKey] = "true"
 	if os.Getenv("ENABLE_NAD") == "true" {
 		d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
 	}
