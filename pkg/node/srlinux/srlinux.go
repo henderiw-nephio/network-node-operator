@@ -221,7 +221,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 			Containers:                    getContainers(cr.GetName(), nc),
 			TerminationGracePeriodSeconds: pointer.Int64(terminationGracePeriodSeconds),
 			NodeSelector:                  map[string]string{},
-			Affinity:                      getAffinity(cr.GetName()),
+			Affinity:                      getAffinity(cr.Spec.Topology),
 			Volumes:                       getVolumes(cr.GetName(), nc),
 		},
 	}
@@ -407,7 +407,7 @@ func getContainers(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Con
 	}}
 }
 
-func getAffinity(name string) *corev1.Affinity {
+func getAffinity(topology string) *corev1.Affinity {
 	return &corev1.Affinity{
 		PodAntiAffinity: &corev1.PodAntiAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
@@ -418,7 +418,7 @@ func getAffinity(name string) *corev1.Affinity {
 							MatchExpressions: []metav1.LabelSelectorRequirement{{
 								Key:      "topo",
 								Operator: "In",
-								Values:   []string{name},
+								Values:   []string{topology},
 							}},
 						},
 						TopologyKey: "kubernetes.io/hostname",
