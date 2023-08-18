@@ -172,6 +172,8 @@ github.com/nokia/k8s-ipam v0.0.4-0.20230723233843-2a1579cd87d7 h1:JHkZhQZV9pJrrO
 github.com/nokia/k8s-ipam v0.0.4-0.20230723233843-2a1579cd87d7/go.mod h1:aGfLcDrJRo7S77K2xfiI8YbmF6wgMvAxWYR3FulWfjw=
 github.com/nokia/k8s-ipam v0.0.4-0.20230806104739-86c9fc0dd81a h1:cttsSrapOmprW6sDvzQQ6tLS8woPYTYyzvk9wjF+1bQ=
 github.com/nokia/k8s-ipam v0.0.4-0.20230806104739-86c9fc0dd81a/go.mod h1:25EuJVW6OSxckHVaErTowmrsqnSI1XiA1izq8osB//w=
+github.com/nokia/k8s-ipam v0.0.4-0.20230818083810-0bd2bc975599 h1:xhGqacnpA5cjkVqD/5OPKF9cVKlO+rtLilT1y59rvjA=
+github.com/nokia/k8s-ipam v0.0.4-0.20230818083810-0bd2bc975599/go.mod h1:25EuJVW6OSxckHVaErTowmrsqnSI1XiA1izq8osB//w=
 github.com/onsi/ginkgo v1.16.5 h1:8xi0RTUf59SOSfEtZMvwTvXYMzG4gV23XVHOZiXNtnE=
 github.com/onsi/ginkgo/v2 v2.9.5 h1:+6Hr4uxzP4XIUyAkg61dWBw8lb/gc4/X5luuxN/EC+Q=
 github.com/onsi/gomega v1.27.7 h1:fVih9JD6ogIiHUN6ePK7HJidyEDpWGVB5mzM7cWNXoU=

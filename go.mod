@@ -8,7 +8,7 @@ require (
 	github.com/henderiw-nephio/network v0.0.0-20230626193806-04743403261e
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230629025102-1d5a6bc22053
-	github.com/nokia/k8s-ipam v0.0.4-0.20230806104739-86c9fc0dd81a
+	github.com/nokia/k8s-ipam v0.0.4-0.20230818083810-0bd2bc975599
 	github.com/pkg/errors v0.9.1
 	github.com/scrapli/scrapligo v1.1.10
 	github.com/stretchr/testify v1.8.2

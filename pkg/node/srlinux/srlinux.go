@@ -221,7 +221,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 			Containers:                    getContainers(cr.GetName(), nc),
 			TerminationGracePeriodSeconds: pointer.Int64(terminationGracePeriodSeconds),
 			NodeSelector:                  map[string]string{},
-			Affinity:                      getAffinity(cr.Spec.Topology),
+			Affinity:                      getAffinity(cr.Namespace),
 			Volumes:                       getVolumes(cr.GetName(), nc),
 		},
 	}
@@ -235,6 +235,11 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 	if os.Getenv("ENABLE_NAD") == "true" {
 		d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
 	}
+
+	if len(d.GetLabels()) == 0 {
+		d.ObjectMeta.Labels = map[string]string{}
+	}
+	d.ObjectMeta.Labels[invv1alpha1.NephioTopologyKey] = cr.Namespace
 
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
 		return nil, err
@@ -416,7 +421,7 @@ func getAffinity(topology string) *corev1.Affinity {
 					PodAffinityTerm: corev1.PodAffinityTerm{
 						LabelSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{{
-								Key:      "topo",
+								Key:      invv1alpha1.NephioTopologyKey,
 								Operator: "In",
 								Values:   []string{topology},
 							}},
