@@ -133,6 +133,8 @@ type srl struct {
 	scheme *runtime.Scheme
 }
 
+func (r *srl) GetProviderType(ctx context.Context) node.ProviderType { return node.ProviderTypeNetwork}
+
 func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
@@ -156,7 +158,7 @@ func (r *srl) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfig
 	}
 }
 
-func (r *srl) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
+func (r *srl) GetNodeModel(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
 	nm := &invv1alpha1.NodeModel{}
 	if err := r.Get(ctx, types.NamespacedName{
 		Name:      fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSrlinuxVariant)),
@@ -324,7 +326,6 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	}
 
 	return nil
-
 }
 
 func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
