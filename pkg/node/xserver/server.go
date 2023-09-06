@@ -35,7 +35,9 @@ type server struct {
 	scheme *runtime.Scheme
 }
 
-func (r *server) GetProviderType(ctx context.Context) node.ProviderType { return node.ProviderTypeServer}
+func (r *server) GetProviderType(ctx context.Context) node.ProviderType {
+	return node.ProviderTypeServer
+}
 
 func (r *server) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
