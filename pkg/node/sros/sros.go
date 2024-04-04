@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
-	"strings"
 
 	"github.com/henderiw-nephio/network-node-operator/pkg/cert"
 	"github.com/henderiw-nephio/network-node-operator/pkg/nad"
@@ -27,60 +25,41 @@ import (
 )
 
 const (
-	NokiaSRLinuxProvider = "srlinux.nokia.com"
-	//srlNodeLabelKey         = invv1alpha1.GroupVersion.Group + "/" + "node"
-	defaultSRLinuxImageName = "ghcr.io/nokia/srlinux:latest"
-	defaultSRLinuxVariant   = "ixrd3l"
-	scrapliGoSRLinuxKey     = "nokia_srl"
+	NokiaSROSProvider    = "sros.nokia.com"
+	defaultSROSImageName = "ghcr.io/nokia/srlinux:latest"
+	defaultSROSVariant   = "ixrd3l"
+	scrapliGoSROSKey     = "nokia_sros"
 
 	//
-	terminationGracePeriodSeconds = 0
-	readinessFile                 = "/etc/opt/srlinux/devices/app_ephemeral.mgmt_server.ready_for_config"
-	readinessInitialDelay         = 10
-	readinessPeriodSeconds        = 5
-	readinessFailureThreshold     = 10
-	podAffinityWeight             = 100
+	startupInitialDelay      = 15
+	startupFailureThreshold  = 3
+	startupPeriodSeconds     = 5
+	startupSuccessThreshold  = 1
+	startupTimeoutSeconds    = 1
+	livenessInitialDelay     = 3
+	livenessFailureThreshold = 3
+	livenessPeriodSeconds    = 15
+	livenessSuccessThreshold = 1
+	livenessTimeoutSeconds   = 1
+	podAffinityWeight        = 100
 
 	// volumes
 	//initialConfigVolMntPath  = "/tmp/initial-config"
-	//initialConfigCfgMapName  = "srlinux-initial-config"
+	//initialConfigCfgMapName  = "sros-initial-config"
 	defaultSecretUserNameKey = "username"
 	defaultSecretPasswordKey = "password"
 	certificateProfileName   = "k8s-profile"
 	//certificateVolName         = "serving-cert"
 	//certificateVolMntPath      = "serving-certs"
 	//initialConfigVolName       = "initial-config-volume"
-	variantsVolName            = "variants"
-	variantsVolMntPath         = "/tmp/topo"
-	variantsTemplateTempName   = "topo-template.yml"
-	variantsCfgMapName         = "srlinux.nokia.com-variants"
-	topomacVolName             = "topomac-script"
-	topomacVolMntPath          = "/tmp/topomac"
-	topomacCfgMapName          = "srlinux.nokia.com-topomac-script"
-	k8sEntrypointVolName       = "k8s-entrypoint"
-	k8sEntrypointVolMntPath    = "/k8s-entrypoint.sh"
-	k8sEntrypointVolMntSubPath = "k8s-entrypoint.sh"
-	k8sEntrypointCfgMapName    = "srlinux.nokia.com-k8s-entrypoint"
-	fileMode777                = 0o777
-	licenseCfgMapName          = "licenses.srl.nokia.com"
-	licensesVolName            = "license"
-	licenseFileName            = "license.key"
-	licenseMntPath             = "/opt/srlinux/etc/license.key"
-	licenseMntSubPath          = "license.key"
-	banner                     = `................................................................
-	:                  Welcome to Nokia SR Linux!                  :
-	:              Open Network OS for the NetOps era.             :
-	:                                                              :
-	:    This is a freely distributed official container image.    :
-	:                      Use it - Share it                       :
-	:                                                              :
-	: Get started: https://learn.srlinux.dev                       :
-	: Container:   https://go.srlinux.dev/container-image          :
-	: Docs:        https://doc.srlinux.dev/22-11                   :
-	: Rel. notes:  https://doc.srlinux.dev/rn22-11-2               :
-	: YANG:        https://yang.srlinux.dev/v22.11.2               :
-	: Discord:     https://go.srlinux.dev/discord                  :
-	: Contact:     https://go.srlinux.dev/contact-sales            :
+	licenseCfgMapName = "licenses.sros.nokia.com"
+	licensesVolName   = "license"
+	licenseFileName   = "license.txt"
+	licenseMntPath    = "/nokia/license/"
+	hugePagesVolName  = "hugepages"
+	hugePagesMntPath  = "/dev/hugepages"
+	banner            = `................................................................
+	:                  Welcome to Nokia SROS!                      :
 	................................................................
 	`
 )
@@ -88,20 +67,11 @@ const (
 var (
 	//nolint:gochecknoglobals
 	defaultCmd = []string{
-		"/tini",
-		"--",
-		"fixuid",
-		"-q",
-		k8sEntrypointVolMntPath,
+		"bin/tini",
 	}
 
 	//nolint:gochecknoglobals
-	defaultArgs = []string{
-		"sudo",
-		"bash",
-		"-c",
-		"touch /.dockerenv && /opt/srlinux/bin/sr_linux",
-	}
+	defaultArgs = []string{}
 
 	//nolint:gochecknoglobals
 	defaultEnv = []corev1.EnvVar{
@@ -113,54 +83,54 @@ var (
 
 	//nolint:gochecknoglobals
 	defaultResourceRequests = map[string]string{
-		"cpu":    "0.5",
-		"memory": "1Gi",
+		"cpu":    "2",
+		"memory": "8Gi",
 	}
-	defaultResourceLimits = map[string]string{}
+	defaultResourceLimits = map[string]string{
+		"cpu":           "2",
+		"memory":        "8Gi",
+		"hugepages-1Gi": "8Gi",
+	}
 )
 
 // Register registers the node in the NodeRegistry.
 func Register(r node.NodeRegistry) {
-	r.Register(NokiaSRLinuxProvider, func(c client.Client, s *runtime.Scheme) node.Node {
-		return &srl{
+	r.Register(NokiaSROSProvider, func(c client.Client, s *runtime.Scheme) node.Node {
+		return &sros{
 			Client: c,
 			scheme: s,
 		}
 	})
 }
 
-type srl struct {
+type sros struct {
 	client.Client
 	scheme *runtime.Scheme
 }
 
-func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
+func (r *sros) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
 	if err != nil {
 		return nil, err
 	}
 
-	// validate if the model returned exists in the variant list
-	if err := r.checkVariants(ctx, cr, nodeConfig.GetModel(defaultSRLinuxVariant)); err != nil {
-		return nil, err
-	}
 	return nodeConfig, nil
 }
 
-func (r *srl) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfig) *corev1.ObjectReference {
+func (r *sros) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfig) *corev1.ObjectReference {
 	return &corev1.ObjectReference{
 		APIVersion: invv1alpha1.NodeKindAPIVersion,
 		Kind:       invv1alpha1.NodeModelKind,
-		Name:       fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSRLinuxVariant)),
+		Name:       fmt.Sprintf("%s-%s", NokiaSROSProvider, nc.GetModel(defaultSROSVariant)),
 		Namespace:  os.Getenv("POD_NAMESPACE"),
 	}
 }
 
-func (r *srl) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
+func (r *sros) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
 	nm := &invv1alpha1.NodeModel{}
 	if err := r.Get(ctx, types.NamespacedName{
-		Name:      fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSRLinuxVariant)),
+		Name:      fmt.Sprintf("%s-%s", NokiaSROSProvider, nc.GetModel(defaultSROSVariant)),
 		Namespace: os.Getenv("POD_NAMESPACE"),
 	}, nm); err != nil {
 		return nil, err
@@ -168,51 +138,66 @@ func (r *srl) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*i
 	return nm, nil
 }
 
-func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {
+func (r *sros) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*nadv1.NetworkAttachmentDefinition, error) {
 	// todo check node model and get interfaces from the model
 	nads := []*nadv1.NetworkAttachmentDefinition{}
-	ifNames := []string{"e1-1", "e1-2"}
-	for _, ifName := range ifNames {
-		b, err := nad.GetNadConfig([]nad.PluginConfigInterface{
-			nad.WirePlugin{
-				PluginCniType: nad.PluginCniType{
-					Type: nad.WirePluginType,
+	/*
+		for _, ifName := range ifNames {
+			b, err := nad.GetNadConfig([]nad.PluginConfigInterface{
+				nad.WirePlugin{
+					PluginCniType: nad.PluginCniType{
+						Type: nad.WirePluginType,
+					},
+					InterfaceName: ifName,
 				},
-				InterfaceName: ifName,
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
+			})
+			if err != nil {
+				return nil, err
+			}
 
-		n := &nadv1.NetworkAttachmentDefinition{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: nadv1.SchemeGroupVersion.Identifier(),
-				Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cr.GetNamespace(),
-				Name:      strings.Join([]string{cr.GetName(), ifName}, "-"),
-			},
-			Spec: nadv1.NetworkAttachmentDefinitionSpec{
-				Config: string(b),
-			},
+			n := &nadv1.NetworkAttachmentDefinition{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: nadv1.SchemeGroupVersion.Identifier(),
+					Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cr.GetNamespace(),
+					Name:      strings.Join([]string{cr.GetName(), ifName}, "-"),
+				},
+				Spec: nadv1.NetworkAttachmentDefinitionSpec{
+					Config: string(b),
+				},
+			}
+			if err := ctrl.SetControllerReference(cr, n, r.scheme); err != nil {
+				return nil, err
+			}
+			nads = append(nads, n)
 		}
-		if err := ctrl.SetControllerReference(cr, n, r.scheme); err != nil {
-			return nil, err
-		}
-		nads = append(nads, n)
-	}
+	*/
 	return nads, nil
 }
 
-func (r *srl) GetPersistentVolumeClaims(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*corev1.PersistentVolumeClaim, error) {
-	// todo check node model and get interfaces from the model
+func (r *sros) GetPersistentVolumeClaims(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*corev1.PersistentVolumeClaim, error) {
 	pvcs := []*corev1.PersistentVolumeClaim{}
+	for _, pv := range nc.Spec.PersistentVolumes {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s", cr.GetName(), pv.Name),
+				Namespace: cr.GetNamespace(),
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{},
+				Resources: corev1.ResourceRequirements{
+					Requests: pv.Requests,
+				},
+			},
+		}
+		pvcs = append(pvcs, pvc)
+	}
 	return pvcs, nil
 }
 
-func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig, nads []*nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
+func (r *sros) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig, nads []*nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
 	nadAnnotation, err := nad.GetNadAnnotation(nads)
 	if err != nil {
 		return nil, err
@@ -224,12 +209,10 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 			Namespace: cr.GetNamespace(),
 		},
 		Spec: corev1.PodSpec{
-			//InitContainers:                []corev1.Container{},
-			Containers:                    getContainers(cr.GetName(), nc),
-			TerminationGracePeriodSeconds: pointer.Int64(terminationGracePeriodSeconds),
-			NodeSelector:                  map[string]string{},
-			Affinity:                      getAffinity(cr.GetNamespace()),
-			Volumes:                       getVolumes(cr.GetName(), nc),
+			Containers:   getContainers(cr.GetName(), nc),
+			NodeSelector: map[string]string{},
+			Affinity:     getAffinity(cr.GetNamespace()),
+			Volumes:      getVolumes(cr.GetName(), nc),
 		},
 	}
 
@@ -249,11 +232,11 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 	return d, nil
 }
 
-func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []corev1.PodIP) error {
+func (r *sros) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []corev1.PodIP) error {
 	secret := &corev1.Secret{}
 	// we assume right now the default secret name is equal to the provider
 	// this provider username and password
-	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: NokiaSRLinuxProvider}, secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: NokiaSROSProvider}, secret); err != nil {
 		return err
 	}
 
@@ -271,7 +254,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	//fmt.Printf("certData: %v\n", *certData)
 
 	p, err := platform.NewPlatform(
-		scrapliGoSRLinuxKey,
+		scrapliGoSROSKey,
 		ips[0].IP,
 		options.WithAuthNoStrictKey(),
 		options.WithAuthUsername(string(secret.Data[defaultSecretUserNameKey])),
@@ -329,7 +312,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 
 }
 
-func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
+func (r *sros) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 
 	if cr.Spec.NodeConfig != nil && cr.Spec.NodeConfig.Name != "" {
 		nc := &invv1alpha1.NodeConfig{}
@@ -373,43 +356,49 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 	}, nil
 }
 
-func (r *srl) checkVariants(ctx context.Context, cr *invv1alpha1.Node, model string) error {
-	variants := &corev1.ConfigMap{}
-	if err := r.Get(ctx, types.NamespacedName{Name: variantsCfgMapName, Namespace: cr.GetNamespace()}, variants); err != nil {
-		return err
-	}
-	if _, ok := variants.Data[model]; !ok {
-		return fmt.Errorf("cannot deploy pod, variant not provided in the configmap, got: %s", model)
-	}
-	return nil
-}
-
-func getContainers(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Container {
+func getContainers(name string, nc *invv1alpha1.NodeConfig) []corev1.Container {
 	return []corev1.Container{{
 		Name:            name,
-		Image:           nodeConfig.GetImage(defaultSRLinuxImageName),
+		Image:           nc.GetImage(defaultSROSImageName),
 		Command:         defaultCmd,
 		Args:            defaultArgs,
 		Env:             defaultEnv,
-		Resources:       nodeConfig.GetResourceRequirements(defaultResourceRequests, defaultResourceLimits),
+		Resources:       nc.GetResourceRequirements(defaultResourceRequests, defaultResourceLimits),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.Bool(true),
 			RunAsUser:  pointer.Int64(0),
 		},
-		VolumeMounts: getVolumeMounts(nodeConfig),
-		ReadinessProbe: &corev1.Probe{
+		TTY:          true,
+		Stdin:        true,
+		VolumeMounts: getVolumeMounts(nc),
+		StartupProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"cat",
-						readinessFile,
+						"/opt/nokia/bin/startup_probe",
 					},
 				},
 			},
-			InitialDelaySeconds: readinessInitialDelay,
-			PeriodSeconds:       readinessPeriodSeconds,
-			FailureThreshold:    readinessFailureThreshold,
+			InitialDelaySeconds: startupInitialDelay,
+			FailureThreshold:    startupFailureThreshold,
+			PeriodSeconds:       startupPeriodSeconds,
+			SuccessThreshold:    startupSuccessThreshold,
+			TimeoutSeconds:      startupTimeoutSeconds,
+		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/opt/nokia/bin/liveness_probe",
+					},
+				},
+			},
+			InitialDelaySeconds: livenessInitialDelay,
+			FailureThreshold:    livenessFailureThreshold,
+			PeriodSeconds:       livenessPeriodSeconds,
+			SuccessThreshold:    livenessSuccessThreshold,
+			TimeoutSeconds:      livenessTimeoutSeconds,
 		},
 	}}
 }
@@ -436,107 +425,29 @@ func getAffinity(topology string) *corev1.Affinity {
 	}
 }
 
-func getVolumes(_ string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Volume {
-	vols := []corev1.Volume{
-		{
-			Name: variantsVolName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: variantsCfgMapName,
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  nodeConfig.GetModel(defaultSRLinuxVariant),
-							Path: variantsTemplateTempName,
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: topomacVolName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: topomacCfgMapName,
-					},
-				},
-			},
-		},
-		{
-			Name: k8sEntrypointVolName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: k8sEntrypointCfgMapName,
-					},
-					DefaultMode: pointer.Int32(fileMode777),
-				},
-			},
-		},
-		/*
-			{
-				Name: initialConfigVolName,
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: initialConfigCfgMapName,
-						},
-					},
-				},
-			},
-		*/
-		/*
-			{
-				Name: strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: name,
-						//DefaultMode: pointer.Int32(0755),
-					},
-				},
-			},
-		*/
+func getVolumes(_ string, nc *invv1alpha1.NodeConfig) []corev1.Volume {
+	vols := []corev1.Volume{}
+	vols = append(vols, getHugePagesVolume())
+
+	for _, pv := range nc.Spec.PersistentVolumes {
+		vols = append(vols, getPersistentVolume(pv.Name))
 	}
-	if nodeConfig.Spec.LicenseKey != nil {
-		vols = append(vols, getLicenseVolume(nodeConfig))
+
+	if nc.Spec.LicenseKey != nil {
+		vols = append(vols, getLicenseVolume(nc))
 	}
 	return vols
 }
 
-func getVolumeMounts(nodeConfig *invv1alpha1.NodeConfig) []corev1.VolumeMount {
-	vms := []corev1.VolumeMount{
-		{
-			Name:      variantsVolName,
-			MountPath: variantsVolMntPath,
-		},
-		{
-			Name:      topomacVolName,
-			MountPath: topomacVolMntPath,
-		},
-		{
-			Name:      k8sEntrypointVolName,
-			MountPath: k8sEntrypointVolMntPath,
-			SubPath:   k8sEntrypointVolMntSubPath,
-		},
-		/*
-			{
-				Name:      initialConfigVolName,
-				MountPath: initialConfigVolMntPath,
-				ReadOnly:  false,
-			},
-		*/
-		/*
-			{
-				Name:      strings.Join([]string{certificateProfileName, certificateVolName}, "-"),
-				MountPath: filepath.Join("tmp", certificateProfileName, certificateVolMntPath),
-				ReadOnly:  true,
-			},
-		*/
+func getVolumeMounts(nc *invv1alpha1.NodeConfig) []corev1.VolumeMount {
+	vms := []corev1.VolumeMount{}
+	vms = append(vms, getHugePagesVolumeMount())
+
+	for _, pv := range nc.Spec.PersistentVolumes {
+		vms = append(vms, getPersistentVolumeMount(pv.Name, pv.MountPath))
 	}
 
-	if nodeConfig.Spec.LicenseKey != nil {
+	if nc.Spec.LicenseKey != nil {
 		vms = append(vms, getLicenseVolumeMount())
 	}
 
@@ -547,7 +458,6 @@ func getLicenseVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      licensesVolName,
 		MountPath: licenseMntPath,
-		SubPath:   licenseMntSubPath,
 	}
 }
 
@@ -568,13 +478,41 @@ func getLicenseVolume(nodeConfig *invv1alpha1.NodeConfig) corev1.Volume {
 	}
 }
 
-/*
-func GetSelectorLabels(name string) map[string]string {
-	return map[string]string{
-		srlNodeLabelKey: name,
+func getHugePagesVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      hugePagesVolName,
+		MountPath: hugePagesMntPath,
 	}
 }
-*/
+
+func getHugePagesVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: hugePagesVolName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				Medium: "HugePages",
+			},
+		},
+	}
+}
+
+func getPersistentVolumeMount(name, mounthPath string) corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      name,
+		MountPath: mounthPath,
+	}
+}
+
+func getPersistentVolume(name string) corev1.Volume {
+	return corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: fmt.Sprintf("pvc-%s", name),
+			},
+		},
+	}
+}
 
 func getHash(x any) string {
 	b, err := json.Marshal(x)
