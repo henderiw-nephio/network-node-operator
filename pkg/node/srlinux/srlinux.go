@@ -34,7 +34,7 @@ const (
 	NokiaSRLinuxProvider = "srlinux.nokia.com"
 	//srlNodeLabelKey         = invv1alpha1.GroupVersion.Group + "/" + "node"
 	defaultSRLinuxImageName = "ghcr.io/nokia/srlinux:latest"
-	defaultSrlinuxVariant   = "ixrd3l"
+	defaultSRLinuxVariant   = "ixrd3l"
 	scrapliGoSRLinuxKey     = "nokia_srl"
 
 	//
@@ -43,7 +43,7 @@ const (
 	readinessInitialDelay         = 10
 	readinessPeriodSeconds        = 5
 	readinessFailureThreshold     = 10
-	srlinuxPodAffinityWeight      = 100
+	podAffinityWeight             = 100
 
 	// volumes
 	//initialConfigVolMntPath  = "/tmp/initial-config"
@@ -116,10 +116,11 @@ var (
 	}
 
 	//nolint:gochecknoglobals
-	defaultConstraints = map[string]string{
+	defaultResourceRequests = map[string]string{
 		"cpu":    "0.5",
 		"memory": "1Gi",
 	}
+	defaultResourceLimits = map[string]string{}
 )
 
 // Register registers the node in the NodeRegistry.
@@ -147,7 +148,7 @@ func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 	}
 
 	// validate if the model returned exists in the variant list
-	if err := r.checkVariants(ctx, cr, nodeConfig.GetModel(defaultSrlinuxVariant)); err != nil {
+	if err := r.checkVariants(ctx, cr, nodeConfig.GetModel(defaultSRLinuxVariant)); err != nil {
 		return nil, err
 	}
 	return nodeConfig, nil
@@ -157,16 +158,16 @@ func (r *srl) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfig
 	return &corev1.ObjectReference{
 		APIVersion: invv1alpha1.NodeKindAPIVersion,
 		Kind:       invv1alpha1.NodeModelKind,
-		Name:       fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSrlinuxVariant)),
-		Namespace:  nc.GetNamespace(),
+		Name:       fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSRLinuxVariant)),
+		Namespace:  os.Getenv("POD_NAMESPACE"),
 	}
 }
 
 func (r *srl) GetNodeModel(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
 	nm := &invv1alpha1.NodeModel{}
 	if err := r.Get(ctx, types.NamespacedName{
-		Name:      fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSrlinuxVariant)),
-		Namespace: nc.GetNamespace(),
+		Name:      fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSRLinuxVariant)),
+		Namespace: os.Getenv("POD_NAMESPACE"),
 	}, nm); err != nil {
 		return nil, err
 	}
@@ -211,6 +212,12 @@ func (r *srl) GetNetworkAttachmentDefinitions(ctx context.Context, cr *invv1alph
 	return nads, nil
 }
 
+func (r *srl) GetPersistentVolumeClaims(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig) ([]*corev1.PersistentVolumeClaim, error) {
+	// todo check node model and get interfaces from the model
+	pvcs := []*corev1.PersistentVolumeClaim{}
+	return pvcs, nil
+}
+
 func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alpha1.NodeConfig, nads []*nadv1.NetworkAttachmentDefinition) (*corev1.Pod, error) {
 	nadAnnotation, err := nad.GetNadAnnotation(nads)
 	if err != nil {
@@ -227,7 +234,7 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 			Containers:                    getContainers(cr.GetName(), nc),
 			TerminationGracePeriodSeconds: pointer.Int64(terminationGracePeriodSeconds),
 			NodeSelector:                  map[string]string{},
-			Affinity:                      getAffinity(cr.Namespace),
+			Affinity:                      getAffinity(cr.GetNamespace()),
 			Volumes:                       getVolumes(cr.GetName(), nc),
 		},
 	}
@@ -383,7 +390,7 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 
 	if cr.Spec.NodeConfig != nil && cr.Spec.NodeConfig.Name != "" {
 		nc := &invv1alpha1.NodeConfig{}
-		if err := r.Get(ctx, types.NamespacedName{Name: cr.Spec.NodeConfig.Name, Namespace: cr.GetNamespace()}, nc); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: cr.Spec.NodeConfig.Name, Namespace: os.Getenv("POD_NAMESPACE")}, nc); err != nil {
 			return nil, err
 		}
 		return nc, nil
@@ -395,7 +402,7 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 	// if still not found we return an empty nodeConfig, which populates the defaults
 
 	opts := []client.ListOption{
-		client.InNamespace(cr.GetNamespace()),
+		client.InNamespace(os.Getenv("POD_NAMESPACE")),
 	}
 	ncl := &invv1alpha1.NodeConfigList{}
 	if err := r.List(ctx, ncl, opts...); err != nil {
@@ -418,7 +425,7 @@ func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1al
 	// if nothing is found we return an empty nodeconfig
 	return &invv1alpha1.NodeConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cr.GetNamespace(),
+			Namespace: os.Getenv("POD_NAMESPACE"),
 		},
 	}, nil
 }
@@ -441,7 +448,7 @@ func getContainers(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Con
 		Command:         defaultCmd,
 		Args:            defaultArgs,
 		Env:             defaultEnv,
-		Resources:       nodeConfig.GetResourceRequirements(defaultConstraints),
+		Resources:       nodeConfig.GetResourceRequirements(defaultResourceRequests, defaultResourceLimits),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.Bool(true),
@@ -469,7 +476,7 @@ func getAffinity(topology string) *corev1.Affinity {
 		PodAntiAffinity: &corev1.PodAntiAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
 				{
-					Weight: srlinuxPodAffinityWeight,
+					Weight: podAffinityWeight,
 					PodAffinityTerm: corev1.PodAffinityTerm{
 						LabelSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{{
@@ -486,7 +493,7 @@ func getAffinity(topology string) *corev1.Affinity {
 	}
 }
 
-func getVolumes(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Volume {
+func getVolumes(_ string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Volume {
 	vols := []corev1.Volume{
 		{
 			Name: variantsVolName,
@@ -497,7 +504,7 @@ func getVolumes(name string, nodeConfig *invv1alpha1.NodeConfig) []corev1.Volume
 					},
 					Items: []corev1.KeyToPath{
 						{
-							Key:  nodeConfig.GetModel(defaultSrlinuxVariant),
+							Key:  nodeConfig.GetModel(defaultSRLinuxVariant),
 							Path: variantsTemplateTempName,
 						},
 					},

@@ -78,7 +78,6 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 		For(&invv1alpha1.Node{}).
 		Owns(&corev1.Pod{}).
 		Complete(r)
-
 }
 
 // reconciler reconciles a srlinux node object
