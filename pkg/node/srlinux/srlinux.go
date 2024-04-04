@@ -1,13 +1,16 @@
 package srlinux
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/henderiw-nephio/network-node-operator/pkg/cert"
 	"github.com/henderiw-nephio/network-node-operator/pkg/nad"
@@ -16,6 +19,7 @@ import (
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/scrapli/scrapligo/driver/opoptions"
 	"github.com/scrapli/scrapligo/driver/options"
+	"github.com/scrapli/scrapligo/logging"
 	"github.com/scrapli/scrapligo/platform"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,6 +138,8 @@ type srl struct {
 	scheme *runtime.Scheme
 }
 
+func (r *srl) GetProviderType(ctx context.Context) node.ProviderType { return node.ProviderTypeNetwork }
+
 func (r *srl) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
@@ -157,7 +163,7 @@ func (r *srl) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfig
 	}
 }
 
-func (r *srl) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
+func (r *srl) GetNodeModel(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
 	nm := &invv1alpha1.NodeModel{}
 	if err := r.Get(ctx, types.NamespacedName{
 		Name:      fmt.Sprintf("%s-%s", NokiaSRLinuxProvider, nc.GetModel(defaultSRLinuxVariant)),
@@ -243,6 +249,11 @@ func (r *srl) GetPodSpec(ctx context.Context, cr *invv1alpha1.Node, nc *invv1alp
 		d.ObjectMeta.Annotations[nadv1.NetworkAttachmentAnnot] = string(nadAnnotation)
 	}
 
+	if len(d.GetLabels()) == 0 {
+		d.ObjectMeta.Labels = map[string]string{}
+	}
+	d.ObjectMeta.Labels[invv1alpha1.NephioTopologyKey] = cr.Namespace
+
 	if err := ctrl.SetControllerReference(cr, d, r.scheme); err != nil {
 		return nil, err
 	}
@@ -268,14 +279,22 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 		return err
 	}
 
-	//fmt.Printf("certData: %v\n", *certData)
+	li, _ := logging.NewInstance(
+		logging.WithLevel(logging.Debug),
+		logging.WithLogger(log.Print),
+	)
 
+	//fmt.Printf("certData: %v\n", *certData)
+	var channelLog bytes.Buffer
 	p, err := platform.NewPlatform(
 		scrapliGoSRLinuxKey,
 		ips[0].IP,
 		options.WithAuthNoStrictKey(),
 		options.WithAuthUsername(string(secret.Data[defaultSecretUserNameKey])),
 		options.WithAuthPassword(string(secret.Data[defaultSecretPasswordKey])),
+		options.WithLogger(li),
+		options.WithChannelLog(&channelLog),
+		options.WithTermWidth(1000),
 	)
 	if err != nil {
 		return err
@@ -284,6 +303,7 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	if err != nil {
 		return err
 	}
+	d.Channel.TimeoutOps = 5 * time.Second
 	err = d.Open()
 	if err != nil {
 		return err
@@ -291,42 +311,79 @@ func (r *srl) SetInitialConfig(ctx context.Context, cr *invv1alpha1.Node, ips []
 	defer d.Close()
 
 	commands := []string{
-		"enter candidate private\n",
-		fmt.Sprintf("set / system tls server-profile %s\n", certData.ProfileName),
-		fmt.Sprintf("set / system tls server-profile %s authenticate-client false\n", certData.ProfileName),
-		fmt.Sprintf("set / system tls server-profile %s key \"%s\" \n", certData.ProfileName, certData.Key),
-		fmt.Sprintf("set / system tls server-profile %s certificate \"%s\" \n", certData.ProfileName, certData.Cert),
-		fmt.Sprintf("set / system tls server-profile %s trust-anchor \"%s\" \n", certData.ProfileName, certData.CA),
-		"set / system lldp admin state enable\n",
-		"set / system gnmi-server admin-state enable\n",
-		"set / system gnmi-server rate-limit 65000\n",
-		"set / system gnmi-server trace-options [ common request response ]\n",
-		"set / system gnmi-server network-instance mgmt admin-state enable\n",
-		fmt.Sprintf("set / system gnmi-server network-instance mgmt tls-profile %s \n", certData.ProfileName),
-		"set / system gnmi-server network-instance mgmt unix-socket admin-state enable\n",
-		"set / system gribi-server admin-state enable\n",
-		"set / system gribi-server network-instance mgmt admin-state enable\n",
-		fmt.Sprintf("set / system gribi-server network-instance mgmt tls-profile %s \n", certData.ProfileName),
-		"set / system json-rpc-server admin-state enable\n",
-		"set / system json-rpc-server network-instance mgmt http admin-state enable\n",
-		"set / system json-rpc-server network-instance mgmt https admin-state enable\n",
-		fmt.Sprintf("set / system json-rpc-server network-instance mgmt https tls-profile %s \n", certData.ProfileName),
-		"set / system p4rt-server admin-state enable\n",
-		"set / system p4rt-server network-instance mgmt admin-state enable\n",
-		fmt.Sprintf("set / system p4rt-server network-instance mgmt tls-profile %s \n", certData.ProfileName),
-		fmt.Sprintf("set / system banner login-banner \"%s\" \n", banner),
-		"commit save",
+		fmt.Sprintf("set / system tls server-profile %s", certData.ProfileName),
+		fmt.Sprintf("set / system tls server-profile %s authenticate-client false", certData.ProfileName),
+		"set / system lldp admin state enable",
+		"set / system gnmi-server admin-state enable",
+		"set / system gnmi-server rate-limit 65000",
+		"set / system gnmi-server trace-options [ common request response ]",
+		"set / system gnmi-server network-instance mgmt admin-state enable",
+		fmt.Sprintf("set / system gnmi-server network-instance mgmt tls-profile %s", certData.ProfileName),
+		"set / system gnmi-server network-instance mgmt unix-socket admin-state enable",
+		"set / system gribi-server admin-state enable",
+		"set / system gribi-server network-instance mgmt admin-state enable",
+		fmt.Sprintf("set / system gribi-server network-instance mgmt tls-profile %s", certData.ProfileName),
+		"set / system json-rpc-server admin-state enable",
+		"set / system json-rpc-server network-instance mgmt http admin-state enable",
+		"set / system json-rpc-server network-instance mgmt https admin-state enable",
+		fmt.Sprintf("set / system json-rpc-server network-instance mgmt https tls-profile %s", certData.ProfileName),
+		"set / system p4rt-server admin-state enable",
+		"set / system p4rt-server network-instance mgmt admin-state enable",
+		fmt.Sprintf("set / system p4rt-server network-instance mgmt tls-profile %s", certData.ProfileName),
 	}
 
-	//fmt.Printf("commands:\n%v\n", commands)
-
-	_, err = d.SendCommands(commands, opoptions.WithEager())
+	_, err = d.SendConfigs(commands, opoptions.WithFuzzyMatchInput())
 	if err != nil {
 		return err
 	}
 
-	return nil
+	// key and cert are send outside of sendconfigs, because it was not working properly with `eager` option
+	_, err = d.SendConfig(fmt.Sprintf("set / system tls server-profile %s key \"%s\"", certData.ProfileName, certData.Key),
+		opoptions.WithEager(),
+	)
+	if err != nil {
+		return err
+	}
 
+	_, err = d.SendConfig(fmt.Sprintf("set / system tls server-profile %s certificate \"%s\"", certData.ProfileName, certData.Cert),
+		opoptions.WithEager(),
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = d.SendConfig(fmt.Sprintf("set / system tls server-profile %s trust-anchor \"%s\"", certData.ProfileName, certData.CA),
+		opoptions.WithEager(),
+	)
+	if err != nil {
+		return err
+	}
+
+	/*
+		_, err = d.SendConfig(fmt.Sprintf("set / system banner login-banner \"%s\"", banner),
+			opoptions.WithFuzzyMatchInput(),
+		)
+		if err != nil {
+			return err
+		}
+	*/
+
+	_, err = d.SendConfig("commit save")
+
+	prompt, err := d.GetPrompt()
+	if err != nil {
+		fmt.Printf("failed to get prompt; error: %+v\n", err)
+		return err
+	}
+
+	fmt.Printf("found prompt: %s\n\n\n", prompt)
+
+	// We can then read and print out the channel log data like normal
+	b := make([]byte, channelLog.Len())
+	_, _ = channelLog.Read(b)
+	fmt.Printf("Channel log output:\n%s", b)
+
+	return nil
 }
 
 func (r *srl) getNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
@@ -423,7 +480,7 @@ func getAffinity(topology string) *corev1.Affinity {
 					PodAffinityTerm: corev1.PodAffinityTerm{
 						LabelSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{{
-								Key:      "topo",
+								Key:      invv1alpha1.NephioTopologyKey,
 								Operator: "In",
 								Values:   []string{topology},
 							}},
