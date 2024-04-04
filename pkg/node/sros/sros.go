@@ -108,6 +108,10 @@ type sros struct {
 	scheme *runtime.Scheme
 }
 
+func (r *sros) GetProviderType(ctx context.Context) node.ProviderType {
+	return node.ProviderTypeNetwork
+}
+
 func (r *sros) GetNodeConfig(ctx context.Context, cr *invv1alpha1.Node) (*invv1alpha1.NodeConfig, error) {
 	// get nodeConfig via paramRef
 	nodeConfig, err := r.getNodeConfig(ctx, cr)
@@ -125,6 +129,17 @@ func (r *sros) GetNodeModelConfig(ctx context.Context, nc *invv1alpha1.NodeConfi
 		Name:       fmt.Sprintf("%s-%s", NokiaSROSProvider, nc.GetModel(defaultSROSVariant)),
 		Namespace:  os.Getenv("POD_NAMESPACE"),
 	}
+}
+
+func (r *sros) GetNodeModel(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {
+	nm := &invv1alpha1.NodeModel{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", NokiaSROSProvider, nc.GetModel(defaultSROSVariant)),
+		Namespace: os.Getenv("POD_NAMESPACE"),
+	}, nm); err != nil {
+		return nil, err
+	}
+	return nm, nil
 }
 
 func (r *sros) GetInterfaces(ctx context.Context, nc *invv1alpha1.NodeConfig) (*invv1alpha1.NodeModel, error) {

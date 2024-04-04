@@ -8,10 +8,10 @@ require (
 	github.com/henderiw-nephio/network v0.0.0-20230626193806-04743403261e
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230629025102-1d5a6bc22053
+	github.com/nokia/k8s-ipam v0.0.4-0.20240225170404-5956497cfeaf
 	github.com/pkg/errors v0.9.1
-	github.com/scrapli/scrapligo v1.1.10
-	github.com/stretchr/testify v1.8.4
 	github.com/scrapli/scrapligo v1.1.13-0.20230905184319-c884aaeecf34
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
 	k8s.io/api v0.27.4
 	k8s.io/apimachinery v0.27.4
